@@ -60,7 +60,8 @@ enum TransitionEffect {
         case .pixelate(let duration):
             return .pixelate(end: duration, duration: duration, current: currentTime)
         case .zoom(let duration, let from, let to):
-            return .zoom(start: end - duration, duration: duration, current: currentTime, from: from, to: to)
+            // Zoom has no in/out variant: the caller anchors it by passing the time the transition begins
+            return .zoom(start: start, duration: duration, current: currentTime, from: from, to: to)
         case .none:
             return .none
         }

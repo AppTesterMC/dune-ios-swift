@@ -18,6 +18,7 @@ final class CopyProtection: DuneNode {
     private let paletteIndex: UInt8 = 6
     private let sentenceIndex: UInt16 = 229
     private var input: String = ""
+    private var bypassProtection = false
 
     private let errorMessage = "Program aborted at the request of the protection comittee."
     private let manualPages: [UInt8] = [
@@ -75,6 +76,14 @@ final class CopyProtection: DuneNode {
         gameFont = nil
         selectedFrameIndex = 0
         input = ""
+        bypassProtection = false
+    }
+  
+  
+    override func onParamsChange() {
+        if let bypassParam = params["bypassProtection"] {
+            self.bypassProtection = bypassParam as! Bool
+        }
     }
     
     
@@ -113,6 +122,10 @@ final class CopyProtection: DuneNode {
     
     
     private func verifyInput() {
+        if bypassProtection {
+            EventManager.nodeEndedEvent.notify(NodeEventData(self.name))
+        }
+      
         guard let pageNumber = Int(input.replacing(/[^0-9]+/, with: "")) else {
             return
         }
