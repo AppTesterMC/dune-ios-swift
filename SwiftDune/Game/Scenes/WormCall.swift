@@ -34,6 +34,11 @@ final class WormCall: DuneNode {
     
     override func onDisable() {
         wormSprite = nil
+      
+        if let sound = wormSound {
+          sound.stop()
+        }
+  
         wormSound = nil
         sky = nil
         currentTime = 0.0

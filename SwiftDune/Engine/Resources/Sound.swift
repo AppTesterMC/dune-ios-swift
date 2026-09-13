@@ -108,9 +108,11 @@ final class Sound: AudioPlayerItem {
         continue
       }
       
-      node.scheduleBuffersLoop(pendingBuffers, numberOfLoops: repeatCount)
-      node.play()
-      
+      if !pendingBuffers.isEmpty {
+        node.scheduleBuffersLoop(pendingBuffers, numberOfLoops: repeatCount)
+        node.play()
+      }
+          
       i += 1
       
       repeatCount = 1
