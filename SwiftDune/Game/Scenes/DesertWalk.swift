@@ -77,6 +77,10 @@ final class DesertWalk: DuneNode {
             self.contextBuffer.tag = 0x0000
         }
 
+        if let travelStep = params["travelStep"] as? Int {
+            self.travelStep = travelStep
+        }
+
         if let duration = params["duration"] {
             self.duration = duration as! TimeInterval
         }
@@ -108,10 +112,9 @@ final class DesertWalk: DuneNode {
     }
 
 
-    // Movement input is deliberately state-only for now. The palace exit
-    // byte is retained, and the scene remains a real data-backed desert view;
-    // this avoids fabricating a map route before the binary's desert records
-    // are decoded. It also gives keyboard and panel arrows a stable target.
+    // Movement keeps the exact palace destination code and updates the shared
+    // world state. The desert renderer remains data-backed while the original
+    // map-neighbour records are being decoded; it never fabricates a route.
     func move(_ direction: DesertMove) {
         guard interactive else { return }
 
@@ -119,6 +122,7 @@ final class DesertWalk: DuneNode {
         case .up, .right, .down, .left:
             travelStep = (travelStep + 1) % 4
         }
+        GameState.shared.recordTravelStep()
         contextBuffer.tag = 0x0000
         currentTime = 0.0
     }

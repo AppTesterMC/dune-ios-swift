@@ -244,6 +244,13 @@ final class GameState {
     // scaling from the original binary.
     private(set) var spiceDensity: UInt8 = 0
     private(set) var currentLocation = 0
+    private(set) var travelStep = 0
+
+    // The executable's location table gives us the initial spice byte, but
+    // troop counts live in the save/game-state records and are not yet fully
+    // decoded. Keep that distinction explicit instead of inventing counts.
+    private(set) var locationSpice: [UInt8] = OriginalGameData.initialSpiceDensity
+    private(set) var locationTroops: [UInt8] = Array(repeating: 0, count: OriginalGameData.initialSpiceDensity.count)
 
     private var tickAccumulator: TimeInterval = 0.0
 
@@ -259,6 +266,9 @@ final class GameState {
         troopOrder = .hold
         spiceDensity = OriginalGameData.spiceDensity(for: 0)
         currentLocation = 0
+        travelStep = 0
+        locationSpice = OriginalGameData.initialSpiceDensity
+        locationTroops = Array(repeating: 0, count: OriginalGameData.initialSpiceDensity.count)
         tickAccumulator = 0.0
     }
 
@@ -289,12 +299,24 @@ final class GameState {
     }
 
     func setLocation(_ location: Int, spiceDensity: UInt8) {
-        currentLocation = max(0, location)
+        currentLocation = min(max(0, location), locationSpice.count - 1)
         self.spiceDensity = spiceDensity
+        travelStep = 0
     }
 
     func setLocation(_ location: Int) {
-        currentLocation = max(0, location)
-        spiceDensity = OriginalGameData.spiceDensity(for: currentLocation)
+        currentLocation = min(max(0, location), locationSpice.count - 1)
+        spiceDensity = locationSpice[currentLocation]
+        travelStep = 0
     }
+
+    func recordTravelStep() {
+        travelStep &+= 1
+    }
+
+    func troopCount(at location: Int? = nil) -> UInt8 {
+        let index = min(max(0, location ?? currentLocation), locationTroops.count - 1)
+        return locationTroops[index]
+    }
+
 }

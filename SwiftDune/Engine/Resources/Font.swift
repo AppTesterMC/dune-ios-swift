@@ -199,7 +199,7 @@ final class GameFont {
             let word = words[j]
 
             // Spacing
-            if j > 0 && j < words.count {
+            if j > 0, spaces.indices.contains(j - 1) {
                 currentX += spaces[j - 1]
             }
 

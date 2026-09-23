@@ -112,7 +112,8 @@ final class Game: DuneNode {
         if let desert = findNode("DesertWalk") {
             desert.params = [
                 "interactive": true,
-                "destinationCode": destinationCode
+                "destinationCode": destinationCode,
+                "travelStep": gameState.travelStep
             ]
         }
         if let flight = findNode("Flight") {
@@ -123,6 +124,7 @@ final class Game: DuneNode {
         }
 
         desertActive = true
+        gameState.setLocation(destinationCode)
         setNodeActive("Palace", false)
         setNodeActive("DesertWalk", true, .background)
         setNodeActive("Flight", true, .foreground)
@@ -261,7 +263,16 @@ final class Game: DuneNode {
         }
 
         if isOverlayActive("Book") || isOverlayActive("Fresk") {
-            if key.specialKey == .keyEscape || key.char.lowercased() == "b" || key.char.lowercased() == "m" {
+            if let fresk = findNode("Fresk") as? Fresk, fresk.isActive {
+                if key.specialKey == .keyEscape || key.char.lowercased() == "m" {
+                    closeOverlay()
+                } else {
+                    fresk.onKey(key)
+                }
+                return
+            }
+
+            if key.specialKey == .keyEscape || key.char.lowercased() == "b" {
                 closeOverlay()
             }
             return

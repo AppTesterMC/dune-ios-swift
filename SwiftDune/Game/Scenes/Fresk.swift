@@ -91,6 +91,24 @@ final class Fresk: DuneNode {
     }
 
 
+    override func onKey(_ key: DuneKeyEvent) {
+        guard let globe = globe else { return }
+
+        switch key.specialKey {
+        case .keyLeft:
+            globe.move(.left)
+        case .keyRight:
+            globe.move(.right)
+        case .keyUp:
+            globe.move(.up)
+        case .keyDown:
+            globe.move(.down)
+        case .none, .keyReturn, .keyDelete, .keyEscape:
+            break
+        }
+    }
+
+
     private func publishMenuState() {
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .globe,
@@ -169,12 +187,6 @@ final class Fresk: DuneNode {
         font.render(commands.sentence(at: 191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
         font.render(commands.sentence(at: 192), rect: DuneRect(28, 124, 264, 20), buffer: buffer, alignment: .center, style: .small)
 
-        let state = GameState.shared
-        font.paletteIndex = 250
-        font.render("DAY \(state.day)", rect: DuneRect(16, 4, 52, 10), buffer: buffer, style: .small)
-        font.render(state.phase.title, rect: DuneRect(252, 4, 52, 10), buffer: buffer, alignment: .center, style: .small)
-        font.render("\(state.spiceDensity)", rect: DuneRect(116, 53, 42, 10), buffer: buffer, alignment: .center, style: .small)
-        font.render(state.troopOrder.title, rect: DuneRect(166, 53, 96, 10), buffer: buffer, alignment: .center, style: .small)
     }
 
 
