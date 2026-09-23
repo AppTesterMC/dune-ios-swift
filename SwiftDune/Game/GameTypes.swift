@@ -185,6 +185,43 @@ enum TroopOrder: CaseIterable, Equatable {
 }
 
 
+/// Constants decoded from the DOS executable rather than tuned for the
+/// Swift frame loop.  Both the floppy DUNEPRG.EXE and the CD DNCDPRG.EXE
+/// contain the same location table and timer constants.
+enum OriginalGameData {
+    static let pitBaseFrequency: Double = 1_193_182.0
+    static let pitDivisor: UInt16 = 0x1745
+    static let timerInterruptFrequency = pitBaseFrequency / Double(pitDivisor)
+
+    // The IRQ handler decrements this counter and advances game time after
+    // it becomes negative.  Therefore a reload of 0x2EE0 produces 0x2EE1
+    // interrupt periods between game-time increments.
+    static let gameTimerReload: UInt16 = 0x2EE0
+    static let interruptsPerGameTick = Double(gameTimerReload) + 1.0
+    static let secondsPerGameTick = interruptsPerGameTick / timerInterruptFrequency
+
+    static let gameHoursPerDay = 16
+    static let sunlightDayOffset = 3
+
+    // DUNEPRG.EXE: file offset 0xEFF0.  DNCDPRG.EXE: file offset 0xF7B0.
+    // Each record is 0x1C bytes; spice density is byte 0x12.
+    static let initialSpiceDensity: [UInt8] = [
+        0, 0, 120, 100, 125, 200, 180, 45, 140, 0,
+        120, 60, 84, 45, 140, 99, 160, 180, 160, 210,
+        0, 200, 170, 240, 200, 240, 180, 160, 100, 250,
+        0, 150, 32, 130, 120, 180, 180, 210, 0, 120,
+        250, 180, 120, 200, 150, 110, 60, 180, 150, 160,
+        170, 210, 195, 240, 200, 210, 50, 0, 230, 200,
+        170, 200, 140, 170, 140, 0, 170, 240, 140, 240
+    ]
+
+    static func spiceDensity(for location: Int) -> UInt8 {
+        guard initialSpiceDensity.indices.contains(location) else { return 0 }
+        return initialSpiceDensity[location]
+    }
+}
+
+
 /// Small, shared gameplay state used by the interactive Swift slice.
 ///
 /// The original save format stores these values in the data segment
@@ -195,6 +232,9 @@ final class GameState {
     static let shared = GameState()
 
     private(set) var elapsedTime: TimeInterval = 0.0
+    private(set) var gameTicks: UInt16 = 0
+    private(set) var gameHour: Int = 0
+    private(set) var sunlightDay: Int = 0
     private(set) var day: Int = 1
     private(set) var phase: GamePhase = .dawn
     private(set) var troopOrder: TroopOrder = .hold
@@ -205,28 +245,41 @@ final class GameState {
     private(set) var spiceDensity: UInt8 = 0
     private(set) var currentLocation = 0
 
-    // One complete four-phase cycle is intentionally isolated as a constant;
-    // replacing it with the binary's tick conversion will not touch callers.
-    private let phaseDuration: TimeInterval = 60.0
+    private var tickAccumulator: TimeInterval = 0.0
 
     private init() {}
 
     func reset() {
         elapsedTime = 0.0
+        gameTicks = 0
+        gameHour = 0
+        sunlightDay = 0
         day = 1
         phase = .dawn
         troopOrder = .hold
-        spiceDensity = 0
+        spiceDensity = OriginalGameData.spiceDensity(for: 0)
         currentLocation = 0
+        tickAccumulator = 0.0
     }
 
     func advance(_ elapsed: TimeInterval) {
         guard elapsed > 0 else { return }
         elapsedTime += elapsed
+        tickAccumulator += elapsed
 
-        let phaseIndex = Int(elapsedTime / phaseDuration) % GamePhase.allCases.count
-        phase = GamePhase.allCases[phaseIndex]
-        day = Int(elapsedTime / (phaseDuration * Double(GamePhase.allCases.count))) + 1
+        while tickAccumulator >= OriginalGameData.secondsPerGameTick {
+            tickAccumulator -= OriginalGameData.secondsPerGameTick
+            gameTicks &+= 1
+        }
+
+        gameHour = Int(gameTicks & 0x000F)
+        day = Int(gameTicks / UInt16(OriginalGameData.gameHoursPerDay)) + 1
+        sunlightDay = Int((UInt32(gameTicks) + UInt32(OriginalGameData.sunlightDayOffset)) >> 4)
+
+        // The executable exposes a 0...15 game hour.  The Swift UI keeps a
+        // four-part light presentation, so each displayed phase covers four
+        // original hours without changing the raw clock semantics.
+        phase = GamePhase.allCases[gameHour / 4]
     }
 
     func cycleTroopOrder() {
@@ -238,5 +291,10 @@ final class GameState {
     func setLocation(_ location: Int, spiceDensity: UInt8) {
         currentLocation = max(0, location)
         self.spiceDensity = spiceDensity
+    }
+
+    func setLocation(_ location: Int) {
+        currentLocation = max(0, location)
+        spiceDensity = OriginalGameData.spiceDensity(for: currentLocation)
     }
 }
