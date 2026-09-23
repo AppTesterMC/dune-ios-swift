@@ -39,6 +39,7 @@ final class Game: DuneNode {
     private var dialogueCharacter: DuneCharacter?
     private let menuRect = DuneRect(92, 159, 136, 40)
     private var musicStarted = false
+    private var desertActive = false
     
     init() {
         super.init("Game")
@@ -51,6 +52,7 @@ final class Game: DuneNode {
       currentMarkers = [0: .leto] // person 0, first marker in throne-room SAL 0
       dialogueCharacter = nil
       musicStarted = false
+      desertActive = false
       
       showRoom()
       showUI()
@@ -84,10 +86,46 @@ final class Game: DuneNode {
           }
         } else {
           let palaceNode = Palace()
-          palaceNode.params = roomParams
+          palaceNode.params = params
           attachNode(palaceNode)
           setNodeActive("Palace", true)
         }
+    }
+
+
+    private func showDesert(destinationCode: Int) {
+        if findNode("DesertWalk") == nil {
+            attachNode(DesertWalk())
+        }
+
+        // The high-bit value is preserved as the original destination code.
+        // We intentionally do not invent a room sequence here: the existing
+        // data-backed desert scene is the safe landing view until the binary's
+        // desert movement records are decoded.
+        if let desert = findNode("DesertWalk") {
+            desert.params = [
+                "interactive": true,
+                "destinationCode": destinationCode
+            ]
+        }
+
+        desertActive = true
+        setNodeActive("Palace", false)
+        setNodeActive("DesertWalk", true, .background)
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed,
+            rightPanel: .roomDirections,
+            items: mainMenuItems,
+            directions: .all
+        ))
+    }
+
+
+    private func leaveDesert() {
+        desertActive = false
+        setNodeActive("DesertWalk", false)
+        showRoom()
+        publishMainUI()
     }
 
     
@@ -121,6 +159,31 @@ final class Game: DuneNode {
 
 
     override func onKey(_ key: DuneKeyEvent) {
+        if desertActive {
+            if key.specialKey == .keyEscape {
+                leaveDesert()
+                return
+            }
+
+            guard let desert = findNode("DesertWalk") as? DesertWalk else {
+                return
+            }
+
+            switch key.specialKey {
+            case .keyLeft:
+                desert.move(.left)
+            case .keyRight:
+                desert.move(.right)
+            case .keyUp:
+                desert.move(.up)
+            case .keyDown:
+                desert.move(.down)
+            case .none, .keyReturn, .keyDelete, .keyEscape:
+                break
+            }
+            return
+        }
+
         if isOverlayActive("Book") || isOverlayActive("Fresk") {
             if key.specialKey == .keyEscape || key.char.lowercased() == "b" || key.char.lowercased() == "m" {
                 closeOverlay()
@@ -151,6 +214,26 @@ final class Game: DuneNode {
 
 
     override func onClick(_ event: DuneMouseClickEvent) {
+        if desertActive {
+            guard let desert = findNode("DesertWalk") as? DesertWalk else {
+                return
+            }
+
+            let point = event.point
+            if point.y >= 152 && point.x >= 228 {
+                if point.x >= 269 && point.x < 279 && point.y >= 162 && point.y < 172 {
+                    desert.move(.up)
+                } else if point.x >= 284 && point.x < 294 && point.y >= 172 && point.y < 182 {
+                    desert.move(.right)
+                } else if point.x >= 269 && point.x < 279 && point.y >= 181 && point.y < 191 {
+                    desert.move(.down)
+                } else if point.x >= 255 && point.x < 265 && point.y >= 172 && point.y < 182 {
+                    desert.move(.left)
+                }
+            }
+            return
+        }
+
         if isOverlayActive("Fresk") {
             if let fresk = findNode("Fresk") as? Fresk {
                 if let action = fresk.menuAction(for: event) {
@@ -289,10 +372,12 @@ final class Game: DuneNode {
             return
         }
 
-        // High-bit exits are the DOS branch into desert movement. That
-        // subsystem is not part of this palace-only Swift slice yet; leave
-        // the player in the room instead of wrapping to an unrelated scene.
-        guard exit < 0x80, exit < palaceRoomExits.count else { return }
+        if exit & 0x80 != 0 {
+            showDesert(destinationCode: Int(exit & 0x7f))
+            return
+        }
+
+        guard exit < palaceRoomExits.count else { return }
         currentGameRoom = Int(exit)
         currentMarkers = currentGameRoom == 10 ? [0: .leto] : [:]
         showRoom()
