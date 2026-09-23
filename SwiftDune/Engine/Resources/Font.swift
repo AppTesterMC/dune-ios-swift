@@ -45,6 +45,27 @@ final class GameFont {
         resource.stream!.seek(0)
         self.charWidths = resource.stream!.readBytes(256)
     }
+
+    /// Convert a Swift character to an index in the original 8-bit DOS font.
+    ///
+    /// The command text is decoded from the game's ISO-8859-1 data, but Swift
+    /// strings can contain Unicode scalars which do not have a corresponding
+    /// glyph in DUNECHAR.HSQ.  Never let those values escape into the font
+    /// tables: results text must be able to render even when it contains an
+    /// accented or otherwise extended character.
+    private func characterIndex(_ character: Swift.Character) -> Int {
+        guard let scalar = String(character).unicodeScalars.first,
+              scalar.value <= 255 else {
+            return charWidths.indices.contains(63) ? 63 : 0
+        }
+
+        let index = Int(scalar.value)
+        return charWidths.indices.contains(index) ? index : (charWidths.indices.contains(63) ? 63 : 0)
+    }
+
+    private var spaceWidth: Int {
+        charWidths.indices.contains(32) ? Int(charWidths[32]) : 5
+    }
     
     
     // TODO: justify text except last line
@@ -57,7 +78,7 @@ final class GameFont {
         // 3. For each line compute space for justification and render
 
         let charHeight: Int = style == .normal ? 9 : 7
-        var spaceWidth = 5 //Int(self.charWidths[32])
+        var spaceWidth = self.spaceWidth
 
         if style == .small {
             spaceWidth = min(6, spaceWidth)
@@ -108,9 +129,9 @@ final class GameFont {
         var i = 0
         
         while i < text.count {
-            let char = text[i].utf8.first!.byteSwapped
-            
-            var charWidth = self.charWidths[Int(char)]
+            let char = characterIndex(text[i])
+
+            var charWidth = self.charWidths[char]
             
             if style == .small {
                 charWidth = min(6, charWidth)
@@ -130,38 +151,45 @@ final class GameFont {
         let charHeight: UInt32 = style == .normal ? 9 : 7
         let offset: UInt32 = style == .normal ? 256 : 1408
         var spaces: [Int] = []
+
+        // Empty sentences are valid in the original command table.  More
+        // importantly, centered text still needs an entry for every gap
+        // between words: the old code only populated `spaces` for left and
+        // justified text, then indexed it while drawing a centered sentence.
+        guard !words.isEmpty else {
+            return
+        }
+
+        var interWordSpace = self.spaceWidth
+        if style == .small {
+            interWordSpace = min(6, interWordSpace)
+        }
         
         if alignment == .justify {
             let wordsWidth = words.reduce(0) { $0 + $1.size }
-            let spaceSize = (Int(width) - wordsWidth) / (words.count - 1)
+            let gapCount = words.count - 1
+            if gapCount == 0 {
+                spaces = []
+            } else {
+                let spaceSize = (Int(width) - wordsWidth) / gapCount
 
-            spaces = Array<Int>(repeating: spaceSize, count: words.count - 1)
+                spaces = Array<Int>(repeating: spaceSize, count: gapCount)
 
-            let remainingSpace = Int(width) - wordsWidth - (spaceSize * (words.count - 1))
+                let remainingSpace = max(0, Int(width) - wordsWidth - (spaceSize * gapCount))
             
-            for i in 0..<remainingSpace {
-                spaces[i % (spaces.count)] += 1
+                for i in 0..<remainingSpace {
+                    spaces[i % spaces.count] += 1
+                }
             }
         } else if alignment == .left {
-            var spaceWidth = Int(self.charWidths[32])
-            
-            if style == .small {
-                spaceWidth = min(6, spaceWidth)
-            }
-            
-            spaces = Array<Int>(repeating: spaceWidth, count: words.count - 1)
+            spaces = Array<Int>(repeating: interWordSpace, count: words.count - 1)
         } else if alignment == .center {
             // Calculate text size including spaces
             let wordsWidth = words.reduce(0) { $0 + $1.size }
-            var spaceWidth = Int(self.charWidths[32])
-          
-            if style == .small {
-                spaceWidth = min(6, spaceWidth)
-            }
-          
-            let textWidth = wordsWidth + (spaceWidth * (words.count - 1))
+            let textWidth = wordsWidth + (interWordSpace * (words.count - 1))
             
             currentX += (Int(width) - textWidth) / 2
+            spaces = Array<Int>(repeating: interWordSpace, count: words.count - 1)
         }
         
         var j = 0
@@ -176,9 +204,9 @@ final class GameFont {
             }
 
             while i < word.text.count {
-                let char = word.text[i].utf8.first!.byteSwapped
-                
-                var charWidth = self.charWidths[Int(char)]
+                let char = characterIndex(word.text[i])
+
+                var charWidth = self.charWidths[char]
                 
                 if style == .small {
                     charWidth = min(6, charWidth)

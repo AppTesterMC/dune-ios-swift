@@ -147,48 +147,60 @@ final class Sprite: Equatable {
             engine.palette.update(&palette[i].chunk, start: palette[i].start, count: palette[i].count)
             i += 1
         }
+
     }
 
     
-  func setAlternatePalette(_ index: Int, _ prevIndex: Int = -1, blend: CGFloat = 1.0) {
-        guard index < alternatePalettes.count else {
+  func setAlternatePalette(
+        _ index: Int,
+        _ prevIndex: Int = -1,
+        blend: CGFloat = 1.0,
+        sourceOffset: Int = 0,
+        destinationStart: Int? = nil,
+        count requestedCount: Int? = nil
+    ) {
+        guard index >= 0 && index < alternatePalettes.count else {
             return
         }
-        
-        let paletteStart = alternatePalettes[index].start
-        let paletteCount = alternatePalettes[index].count
 
-        var chunk = Array<UInt32>(alternatePalettes[index].chunk)
+        let alternate = alternatePalettes[index]
+        let first = max(0, min(sourceOffset, alternate.count))
+        let available = alternate.count - first
+        let paletteCount = min(requestedCount ?? available, available)
+        guard paletteCount > 0 else {
+            return
+        }
 
-        if blend < 1.0 && prevIndex > -1 {
-            let prevChunk = Array<UInt32>(alternatePalettes[prevIndex].chunk)
+        let paletteStart = destinationStart ?? (alternate.start + first)
+        var chunk = Array(alternate.chunk[first..<(first + paletteCount)])
+
+        if blend < 1.0 && prevIndex >= 0 && prevIndex < alternatePalettes.count {
+            let previous = alternatePalettes[prevIndex]
+            let previousEnd = min(first + paletteCount, previous.count)
+            let previousChunk = Array(previous.chunk[first..<previousEnd])
 
             var i = 0
             let a = UInt32(0xFF)
 
-            while i < paletteCount {
+            while i < chunk.count && i < previousChunk.count {
                 let r2 = UInt32(chunk[i]) & 0xFF
                 let g2 = UInt32(chunk[i] >> 8) & 0xFF
                 let b2 = UInt32(chunk[i] >> 16) & 0xFF
 
-                let r1 = UInt32(prevChunk[i]) & 0xFF
-                let g1 = UInt32(prevChunk[i] >> 8) & 0xFF
-                let b1 = UInt32(prevChunk[i] >> 16) & 0xFF
-                
-                // Calculate a subtle delay effect by adjusting the blend per index
-                let colorBlend = blend
-                //engine.logger.log(.debug, "colorBlend: \(colorBlend) - i: \(i) - paletteCount: \(paletteCount)")
-              
-                let r = Math.lerp(r1, r2, colorBlend)
-                let g = Math.lerp(g1, g2, colorBlend)
-                let b = Math.lerp(b1, b2, colorBlend)
-                
+                let r1 = UInt32(previousChunk[i]) & 0xFF
+                let g1 = UInt32(previousChunk[i] >> 8) & 0xFF
+                let b1 = UInt32(previousChunk[i] >> 16) & 0xFF
+
+                let r = Math.lerp(r1, r2, blend)
+                let g = Math.lerp(g1, g2, blend)
+                let b = Math.lerp(b1, b2, blend)
+
                 chunk[i] = (a << 24) | (b << 16) | (g << 8) | r
                 i += 1
             }
         }
-        
-        engine.palette.update(&chunk, start: paletteStart, count: paletteCount)
+
+        engine.palette.update(&chunk, start: paletteStart, count: chunk.count)
     }
     
     
@@ -310,7 +322,7 @@ final class Sprite: Equatable {
         }
         
         animationOffset = resource.stream!.offset
-                
+
         setPalette()
         
       engine.logger.log(.debug, "parseFrames(): finished reading. resource size=\(resource.stream!.size), anim offset=\(animationOffset)")

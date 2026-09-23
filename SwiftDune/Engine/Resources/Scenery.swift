@@ -258,6 +258,20 @@ final class Scenery {
         
         sprite.setPalette()
     }
+
+
+    // Room markers are cached into the room framebuffer, so their palette
+    // must be restored even when the room geometry is not redrawn.
+    func setCharacterPalette() {
+        characterSprite.setPalette()
+    }
+
+
+    // Some room sheets (notably BALCON.HSQ) intentionally omit the shared
+    // command-panel palette. POR.HSQ carries that common block.
+    func setSharedPalette() {
+        sprite(at: 0)?.setPalette()
+    }
     
     
     func drawRoom(_ index: Int, buffer: PixelBuffer) {

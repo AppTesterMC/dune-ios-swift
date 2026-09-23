@@ -33,6 +33,8 @@ final class Palace: DuneNode {
     private var characterSprite: Sprite?
     
     private var currentRoom: PalaceRoom = .stairs
+    private var gameRoomID: Int?
+    private var salRoomIndex: Int?
     private var markers: Dictionary<Int, RoomCharacter> = [:]
     private var character: DuneCharacter = .none
     private var zoomRect: DuneRect?
@@ -61,7 +63,10 @@ final class Palace: DuneNode {
         characterSprite = nil
         
         markers = [:]
+        character = .none
         currentRoom = .stairs
+        gameRoomID = nil
+        salRoomIndex = nil
         currentTime = 0.0
         contextBuffer.tag = 0x0000
         zoomRect = nil
@@ -72,10 +77,22 @@ final class Palace: DuneNode {
     override func onParamsChange() {
         if let room = params["room"] {
             self.currentRoom = room as! PalaceRoom
+            self.currentTime = 0.0
+            self.contextBuffer.tag = 0x0000
+        }
+
+        if let gameRoomID = params["gameRoomID"] as? Int {
+            self.gameRoomID = gameRoomID
+            self.currentTime = 0.0
+            self.contextBuffer.tag = 0x0000
+        }
+        if let salRoomIndex = params["salRoom"] as? Int {
+            self.salRoomIndex = salRoomIndex
         }
         
         if let markers = params["markers"] {
             self.markers = markers as! Dictionary<Int, RoomCharacter>
+            palaceScenery?.characters = self.markers
         }
 
         if let duration = params["duration"] {
@@ -84,6 +101,10 @@ final class Palace: DuneNode {
         
         if let character = params["character"] {
             self.character = character as! DuneCharacter
+            characterSprite = Sprite(self.character.resourceName)
+        } else if params["gameRoomID"] != nil {
+            self.character = .none
+            characterSprite = nil
         }
         
         if let zoom = params["zoom"] {
@@ -140,23 +161,26 @@ final class Palace: DuneNode {
             }
         }
 
+        let roomIndex = salRoomIndex ?? currentRoom.rawValue
+        let isGameplayExterior = gameRoomID == 1 || gameRoomID == 5
+
         // Apply sky gradient with blue palette
-        if currentRoom == .porch || currentRoom == .balcony {
+        if isGameplayExterior || (gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony)) {
             if contextBuffer.tag != 0x0001 {
-                sky.render(contextBuffer, width: 320, at: 0, type: .narrow)
-                palaceScenery.drawRoom(currentRoom.rawValue, buffer: contextBuffer)
+                sky.render(contextBuffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
+                palaceScenery.drawRoom(roomIndex, buffer: contextBuffer)
                 contextBuffer.tag = 0x0001
             }
 
             contextBuffer.render(to: intermediateFrameBuffer, effect: fx)
         } else if currentRoom == .stairs {
             sky.render(intermediateFrameBuffer, width: 200, at: 0, type: .large)
-            palaceScenery.drawRoom(currentRoom.rawValue, buffer: intermediateFrameBuffer)
+            palaceScenery.drawRoom(roomIndex, buffer: intermediateFrameBuffer)
 
             // Fade on palace
             if dayMode == .sunrise {
                 if currentTime > 1.0 {
-                    palaceScenery.setPalette(currentRoom.rawValue)
+                    palaceScenery.setPalette(roomIndex)
                     engine.palette.stash()
                 }
 
@@ -167,9 +191,29 @@ final class Palace: DuneNode {
                     engine.palette.stash()
                 }
             }
+        } else {
+            // Interior rooms have no exterior sky. PALACE.SAL already contains
+            // the complete polygon/sprite command stream for these rooms.
+            palaceScenery.drawRoom(roomIndex, buffer: intermediateFrameBuffer)
+        }
+
+        // Rust's room renderer builds a fresh palette for every frame. Keep
+        // the Swift shared palette deterministic as well: opening the globe
+        // or book must not leave its palette behind when the cached room is
+        // shown again.
+        palaceScenery.setPalette(roomIndex)
+        palaceScenery.setSharedPalette()
+        palaceScenery.setCharacterPalette()
+        // The sky is indexed data, so it must be the final palette writer for
+        // the exterior background. BALCON.HSQ has its own alternate palette;
+        // applying it after SKY.HSQ turns the blue sky into the purple/green
+        // balcony seen after room changes.
+        if gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony || currentRoom == .stairs) {
+            sky.setPalette()
         }
         
         if let characterSprite = characterSprite {
+            characterSprite.setPalette()
             characterSprite.drawAnimation(0, buffer: intermediateFrameBuffer, time: currentTime)
         }
         

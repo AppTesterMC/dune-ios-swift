@@ -42,7 +42,10 @@ final class UI: DuneNode {
     
     private var leftPanel: UILeftPanel = .bookClosed
     private var rightPanel: UIRightPanel = .roomDirections
-    private var directions: UIDirection = [.up, .down, .right]
+    // The first playable palace room supports all four exits.  Keeping the
+    // left arrow in the initial state also avoids making a real exit appear
+    // disabled before the room graph has been queried.
+    private var directions: UIDirection = .all
     private var menuItems: [UInt16] = []
     
     private var commands: Sentence?
@@ -88,6 +91,11 @@ final class UI: DuneNode {
         guard let uiSprite = uiSprite else {
             return
         }
+
+        // Palace scenery and character sprites update the shared palette while
+        // rendering. Restore the UI palette before drawing the panel and its
+        // command text so the playable controls retain their intended colors.
+        uiSprite.setPalette()
                 
         // Block
         uiSprite.drawFrame(15, x: 126, y: 148, buffer: buffer)
@@ -124,9 +132,14 @@ final class UI: DuneNode {
             break
         }
       
-        // Characters
-        uiSprite.drawFrame(64, x: 35, y: 182, buffer: buffer)
-        uiSprite.drawFrame(64, x: 58, y: 182, buffer: buffer)
+        // Companion buttons belong to the normal room HUD only.  The DOS
+        // book and map/globe friezes replace this area with their own panel;
+        // drawing the room buttons there leaves two stray squares over the
+        // left-bottom corner.
+        if leftPanel == .bookClosed {
+            uiSprite.drawFrame(64, x: 35, y: 182, buffer: buffer)
+            uiSprite.drawFrame(64, x: 58, y: 182, buffer: buffer)
+        }
 
         // Right part
         switch rightPanel {
@@ -220,6 +233,7 @@ final class UI: DuneNode {
         self.menuItems = e.items
         self.leftPanel = e.leftPanel
         self.rightPanel = e.rightPanel
+        self.directions = e.directions
     }
 }
 
@@ -228,6 +242,7 @@ struct UIStateEventData {
     var leftPanel: UILeftPanel
     var rightPanel: UIRightPanel
     var items: [UInt16]
+    var directions: UIDirection = .all
 }
 
 

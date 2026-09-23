@@ -12,6 +12,10 @@ enum DuneSpecialKey: UInt16, CaseIterable {
     case keyReturn = 36
     case keyDelete = 51
     case keyEscape = 53
+    case keyLeft = 123
+    case keyRight = 124
+    case keyDown = 125
+    case keyUp = 126
     case none = 0
 }
 
