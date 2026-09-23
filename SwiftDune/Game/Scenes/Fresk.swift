@@ -187,6 +187,25 @@ final class Fresk: DuneNode {
         font.render(commands.sentence(at: 191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
         font.render(commands.sentence(at: 192), rect: DuneRect(28, 124, 264, 20), buffer: buffer, alignment: .center, style: .small)
 
+        // Keep the source command strings above, but expose the live state
+        // that the original results screen is driven by. This is intentionally
+        // raw: the location table and spice bytes are decoded, while troop
+        // population is not yet available from the save record.
+        font.paletteIndex = 250
+        let state = GameState.shared
+        font.render("DAY \(state.day) \(state.phase.title)",
+                    rect: DuneRect(10, 2, 56, 10), buffer: buffer,
+                    alignment: .left, style: .small)
+        font.render("LOC \(state.currentLocation) SPICE \(state.spiceDensity)",
+                    rect: DuneRect(10, 16, 110, 10), buffer: buffer,
+                    alignment: .left, style: .small)
+        font.render("ORDER \(state.troopOrder.title)",
+                    rect: DuneRect(10, 30, 110, 10), buffer: buffer,
+                    alignment: .left, style: .small)
+        font.render(state.milestone.rawValue,
+                    rect: DuneRect(10, 44, 110, 10), buffer: buffer,
+                    alignment: .left, style: .small)
+
     }
 
 

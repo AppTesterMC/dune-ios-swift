@@ -37,6 +37,18 @@ final class Game: DuneNode {
     private var currentGameRoom = 10 // DOS starts at 0x200A, the throne room.
     private var currentMarkers: [Int: RoomCharacter] = [0: .leto]
     private var dialogueCharacter: DuneCharacter?
+    private var lastDialogueCharacter: DuneCharacter?
+    // The first two playable palace speakers are backed by the same marker
+    // slots used by the extracted palace scene records.  Empty rooms remain
+    // empty until their character records are decoded.
+    private let palaceRoomMarkers: [Int: [Int: RoomCharacter]] = [
+        10: [0: .leto],
+        4: [7: .jessica]
+    ]
+    private let palaceRoomSpeakers: [Int: DuneCharacter] = [
+        10: .leto,
+        4: .jessica
+    ]
     private let menuRect = DuneRect(92, 159, 136, 40)
     private var musicStarted = false
     private var desertActive = false
@@ -53,6 +65,7 @@ final class Game: DuneNode {
       currentGameRoom = 10
       currentMarkers = [0: .leto] // person 0, first marker in throne-room SAL 0
       dialogueCharacter = nil
+      lastDialogueCharacter = nil
       musicStarted = false
       desertActive = false
       sietchActive = false
@@ -119,6 +132,7 @@ final class Game: DuneNode {
         if let flight = findNode("Flight") {
             flight.params = [
                 "dayMode": gameState.phase.lightMode,
+                "destinationCode": destinationCode,
                 "duration": TimeInterval.greatestFiniteMagnitude
             ]
         }
@@ -153,14 +167,21 @@ final class Game: DuneNode {
             attachNode(Sietch())
         }
 
+        let firstGameplaySietch = gameState.currentLocation == 12
         if let sietch = findNode("Sietch") {
             sietch.params = [
                 "room": SietchRoom.room8,
-                "markers": [6: RoomCharacter.harah, 9: RoomCharacter.stilgar]
+                // Room 8 with Harah/Stilgar is the extracted intro landing.
+                // The first playable flight lands at location 12; the
+                // walkthrough's first visit there is Gurney's sietch.
+                "markers": firstGameplaySietch ? [:] : [6: RoomCharacter.harah, 9: RoomCharacter.stilgar],
+                "character": firstGameplaySietch ? DuneCharacter.gurney : DuneCharacter.none
             ]
         }
 
         sietchActive = true
+        gameState.setMilestone(firstGameplaySietch ? .firstSietch : .recruitFremen,
+                               action: firstGameplaySietch ? "GURNEY SIETCH" : "SIETCH LANDING")
         setNodeActive("Palace", false)
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
@@ -375,6 +396,11 @@ final class Game: DuneNode {
         }
 
         if dialogueCharacter != nil {
+            if dialogueCharacter == .leto {
+                gameState.setMilestone(.findGurney, action: "LETO SPOKEN")
+            } else if dialogueCharacter == .jessica {
+                gameState.setMilestone(.firstSietch, action: "JESSICA SPOKEN")
+            }
             dialogueCharacter = nil
             showRoom()
             publishMainUI()
@@ -419,9 +445,11 @@ final class Game: DuneNode {
             // 0x0180. In PALACE.SAL room 0 that is marker 0, not intro
             // marker 8. Selecting his command returns to that room with the
             // correct person slot populated.
-            currentGameRoom = 10
-            currentMarkers = [0: .leto]
-            dialogueCharacter = .leto
+            guard let speaker = palaceRoomSpeakers[currentGameRoom] else { return }
+            lastDialogueCharacter = speaker
+            dialogueCharacter = speaker
+            gameState.setMilestone(speaker == .leto ? .meetDuke : .findGurney,
+                                   action: speaker == .leto ? "TALK TO LETO" : "TALK TO JESSICA")
             showRoom()
         case 214:
             showBook()
@@ -492,7 +520,7 @@ final class Game: DuneNode {
 
         guard exit < palaceRoomExits.count else { return }
         currentGameRoom = Int(exit)
-        currentMarkers = currentGameRoom == 10 ? [0: .leto] : [:]
+        currentMarkers = palaceRoomMarkers[currentGameRoom] ?? [:]
         showRoom()
         publishMainUI()
     }

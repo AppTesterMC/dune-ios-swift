@@ -184,6 +184,13 @@ enum TroopOrder: CaseIterable, Equatable {
     }
 }
 
+enum GameplayMilestone: String {
+    case meetDuke = "MEET DUKE LETO"
+    case findGurney = "FIND GURNEY"
+    case firstSietch = "FIRST SIETCH"
+    case recruitFremen = "RECRUIT FREMEN"
+}
+
 
 /// Constants decoded from the DOS executable rather than tuned for the
 /// Swift frame loop.  Both the floppy DUNEPRG.EXE and the CD DNCDPRG.EXE
@@ -238,6 +245,8 @@ final class GameState {
     private(set) var day: Int = 1
     private(set) var phase: GamePhase = .dawn
     private(set) var troopOrder: TroopOrder = .hold
+    private(set) var milestone: GameplayMilestone = .meetDuke
+    private(set) var lastAction = "ARRIVAL"
 
     // These are the current location's data-segment fields. They are kept as
     // raw game values until the location table decoder supplies labels and
@@ -264,6 +273,8 @@ final class GameState {
         day = 1
         phase = .dawn
         troopOrder = .hold
+        milestone = .meetDuke
+        lastAction = "ARRIVAL"
         spiceDensity = OriginalGameData.spiceDensity(for: 0)
         currentLocation = 0
         travelStep = 0
@@ -296,6 +307,12 @@ final class GameState {
         let orders = TroopOrder.allCases
         guard let index = orders.firstIndex(of: troopOrder) else { return }
         troopOrder = orders[(index + 1) % orders.count]
+        lastAction = "ORDER \(troopOrder.title)"
+    }
+
+    func setMilestone(_ milestone: GameplayMilestone, action: String) {
+        self.milestone = milestone
+        lastAction = action
     }
 
     func setLocation(_ location: Int, spiceDensity: UInt8) {

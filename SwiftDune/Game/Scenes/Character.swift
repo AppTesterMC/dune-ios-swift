@@ -8,10 +8,11 @@
 import Foundation
 
 
-enum DuneCharacter {
+enum DuneCharacter: Equatable {
   case none
   case leto
   case jessica
+  case gurney
   case paul
   case chani
   case harah
@@ -30,6 +31,8 @@ enum DuneCharacter {
       "LETO.HSQ"
     case .jessica:
       "JESS.HSQ"
+    case .gurney:
+      "GURN.HSQ"
     case .paul:
       "PAUL.HSQ"
     case .chani:
