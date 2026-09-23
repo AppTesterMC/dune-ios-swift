@@ -26,7 +26,7 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
     private var device: MTLDevice
     private var commandQueue: MTLCommandQueue
     private var texture: MTLTexture
-    private var pipelineState: MTLRenderPipelineState
+    private var pipelineState: MTLRenderPipelineState?
     private var rawBufferPointer: UnsafeMutablePointer<UInt8>
     private var shouldTakeScreenshot = false
     private var screenshotScale = 3
@@ -58,10 +58,12 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         metalView.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0)
         metalView.releaseDrawables()
       
-        // Load the shader files
-        let defaultLibrary = device.makeDefaultLibrary()!
-        let vertexFunction = defaultLibrary.makeFunction(name: "vertex_main")
-        let fragmentFunction = defaultLibrary.makeFunction(name: "fragment_main")
+        // Load the shader files.  A development build can be launched before
+        // Xcode has installed its optional Metal Toolchain; keep that case a
+        // black but usable window instead of crashing during app startup.
+        let defaultLibrary = try? device.makeDefaultLibrary(bundle: Bundle.main)
+        let vertexFunction = defaultLibrary?.makeFunction(name: "vertex_main")
+        let fragmentFunction = defaultLibrary?.makeFunction(name: "fragment_main")
         
         // Create the vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
@@ -84,7 +86,7 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         pipelineDescriptor.depthAttachmentPixelFormat = .invalid
         pipelineDescriptor.stencilAttachmentPixelFormat = .invalid
         
-        pipelineState = try! device.makeRenderPipelineState(descriptor: pipelineDescriptor)
+        pipelineState = try? device.makeRenderPipelineState(descriptor: pipelineDescriptor)
       
         // Create a frame buffer that will contain RGBA components for each pixel to update the texture
         rawBufferPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: frameSize)
@@ -145,6 +147,12 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
               return
             }
             
+            guard let pipelineState = pipelineState else {
+                encoder.endEncoding()
+                commandBuffer.commit()
+                return
+            }
+
             encoder.setRenderPipelineState(pipelineState)
             encoder.setVertexBytes(vertexData, length: vertexDataSize, index: 0)
             encoder.setFragmentTexture(texture, index: 0)
