@@ -224,9 +224,19 @@ final class GameFont {
                     var charX = 0
                     
                     while charX < charWidth {
-                        let destOffset = (currentY + charY) * buffer.width + (currentX + charX)
+                        let destinationX = currentX + charX
+                        let destinationY = currentY + charY
 
-                        if charLine & 0x80 > 0 {
+                        // Results and dialogue text come from binary sentence
+                        // tables and can be wider than their destination
+                        // rectangle. Clip at the framebuffer edge instead of
+                        // allowing a long line to crash the app.
+                        if charLine & 0x80 > 0,
+                           destinationX >= 0,
+                           destinationX < buffer.width,
+                           destinationY >= 0,
+                           destinationY < buffer.height {
+                            let destOffset = destinationY * buffer.width + destinationX
                             buffer.rawPointer[destOffset] = paletteIndex
                         }
 

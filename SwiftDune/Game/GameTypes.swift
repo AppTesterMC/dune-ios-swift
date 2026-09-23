@@ -142,3 +142,101 @@ enum DuneLightMode: Equatable {
 }
 
 
+enum GamePhase: UInt8, CaseIterable {
+    case dawn = 0
+    case day = 1
+    case dusk = 2
+    case night = 3
+
+    var title: String {
+        switch self {
+        case .dawn: return "DAWN"
+        case .day: return "DAY"
+        case .dusk: return "DUSK"
+        case .night: return "NIGHT"
+        }
+    }
+
+    var lightMode: DuneLightMode {
+        switch self {
+        case .dawn: return .sunrise
+        case .day: return .day
+        case .dusk: return .sunset
+        case .night: return .night
+        }
+    }
+}
+
+
+enum TroopOrder: CaseIterable, Equatable {
+    case hold
+    case advance
+    case harvest
+    case regroup
+
+    var title: String {
+        switch self {
+        case .hold: return "HOLD"
+        case .advance: return "ADVANCE"
+        case .harvest: return "HARVEST"
+        case .regroup: return "REGROUP"
+        }
+    }
+}
+
+
+/// Small, shared gameplay state used by the interactive Swift slice.
+///
+/// The original save format stores these values in the data segment
+/// (`game_time`, `game_phase`, and per-location spice/troop bytes). Keeping
+/// them together here lets the HUD, results view, and scenes observe one
+/// state source while the complete save-file reader is still being ported.
+final class GameState {
+    static let shared = GameState()
+
+    private(set) var elapsedTime: TimeInterval = 0.0
+    private(set) var day: Int = 1
+    private(set) var phase: GamePhase = .dawn
+    private(set) var troopOrder: TroopOrder = .hold
+
+    // These are the current location's data-segment fields. They are kept as
+    // raw game values until the location table decoder supplies labels and
+    // scaling from the original binary.
+    private(set) var spiceDensity: UInt8 = 0
+    private(set) var currentLocation = 0
+
+    // One complete four-phase cycle is intentionally isolated as a constant;
+    // replacing it with the binary's tick conversion will not touch callers.
+    private let phaseDuration: TimeInterval = 60.0
+
+    private init() {}
+
+    func reset() {
+        elapsedTime = 0.0
+        day = 1
+        phase = .dawn
+        troopOrder = .hold
+        spiceDensity = 0
+        currentLocation = 0
+    }
+
+    func advance(_ elapsed: TimeInterval) {
+        guard elapsed > 0 else { return }
+        elapsedTime += elapsed
+
+        let phaseIndex = Int(elapsedTime / phaseDuration) % GamePhase.allCases.count
+        phase = GamePhase.allCases[phaseIndex]
+        day = Int(elapsedTime / (phaseDuration * Double(GamePhase.allCases.count))) + 1
+    }
+
+    func cycleTroopOrder() {
+        let orders = TroopOrder.allCases
+        guard let index = orders.firstIndex(of: troopOrder) else { return }
+        troopOrder = orders[(index + 1) % orders.count]
+    }
+
+    func setLocation(_ location: Int, spiceDensity: UInt8) {
+        currentLocation = max(0, location)
+        self.spiceDensity = spiceDensity
+    }
+}

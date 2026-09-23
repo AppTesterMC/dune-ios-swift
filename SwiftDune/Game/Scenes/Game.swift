@@ -40,6 +40,8 @@ final class Game: DuneNode {
     private let menuRect = DuneRect(92, 159, 136, 40)
     private var musicStarted = false
     private var desertActive = false
+    private var sietchActive = false
+    private let gameState = GameState.shared
     
     init() {
         super.init("Game")
@@ -53,6 +55,8 @@ final class Game: DuneNode {
       dialogueCharacter = nil
       musicStarted = false
       desertActive = false
+      sietchActive = false
+      gameState.reset()
       
       showRoom()
       showUI()
@@ -97,6 +101,9 @@ final class Game: DuneNode {
         if findNode("DesertWalk") == nil {
             attachNode(DesertWalk())
         }
+        if findNode("Flight") == nil {
+            attachNode(Flight())
+        }
 
         // The high-bit value is preserved as the original destination code.
         // We intentionally do not invent a room sequence here: the existing
@@ -108,15 +115,24 @@ final class Game: DuneNode {
                 "destinationCode": destinationCode
             ]
         }
+        if let flight = findNode("Flight") {
+            flight.params = [
+                "dayMode": gameState.phase.lightMode,
+                "duration": TimeInterval.greatestFiniteMagnitude
+            ]
+        }
 
         desertActive = true
         setNodeActive("Palace", false)
         setNodeActive("DesertWalk", true, .background)
+        setNodeActive("Flight", true, .foreground)
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .bookClosed,
             rightPanel: .roomDirections,
             items: mainMenuItems,
-            directions: .all
+            directions: .all,
+            day: gameState.day,
+            phase: gameState.phase
         ))
     }
 
@@ -124,8 +140,51 @@ final class Game: DuneNode {
     private func leaveDesert() {
         desertActive = false
         setNodeActive("DesertWalk", false)
+        setNodeActive("Flight", false)
         showRoom()
         publishMainUI()
+    }
+
+
+    private func showSietch() {
+        if findNode("Sietch") == nil {
+            attachNode(Sietch())
+        }
+
+        if let sietch = findNode("Sietch") {
+            sietch.params = [
+                "room": SietchRoom.room8,
+                "markers": [6: RoomCharacter.harah, 9: RoomCharacter.stilgar]
+            ]
+        }
+
+        sietchActive = true
+        setNodeActive("Palace", false)
+        setNodeActive("DesertWalk", false)
+        setNodeActive("Flight", false)
+        setNodeActive("Sietch", true, .background)
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed,
+            rightPanel: .roomDirections,
+            items: mainMenuItems,
+            directions: [],
+            day: gameState.day,
+            phase: gameState.phase
+        ))
+    }
+
+
+    private func closeSietch() {
+        sietchActive = false
+        setNodeActive("Sietch", false)
+        showRoom()
+        publishMainUI()
+    }
+
+
+    override func update(_ elapsedTime: TimeInterval) {
+        gameState.advance(elapsedTime)
+        super.update(elapsedTime)
     }
 
     
@@ -143,6 +202,15 @@ final class Game: DuneNode {
         }
         setNodeActive("Fresk", true)
     }
+
+
+    private func showResults() {
+        if findNode("Fresk") == nil {
+            attachNode(Fresk())
+        }
+        setNodeActive("Fresk", true)
+        (findNode("Fresk") as? Fresk)?.showResults()
+    }
     
     
     func showBook() {
@@ -155,6 +223,7 @@ final class Game: DuneNode {
 
     override func onDisable() {
         musicStarted = false
+        sietchActive = false
     }
 
 
@@ -184,10 +253,33 @@ final class Game: DuneNode {
             return
         }
 
+        if sietchActive {
+            if key.specialKey == .keyEscape {
+                closeSietch()
+            }
+            return
+        }
+
         if isOverlayActive("Book") || isOverlayActive("Fresk") {
             if key.specialKey == .keyEscape || key.char.lowercased() == "b" || key.char.lowercased() == "m" {
                 closeOverlay()
             }
+            return
+        }
+
+        if key.char.lowercased() == "o" {
+            gameState.cycleTroopOrder()
+            publishMainUI()
+            return
+        }
+
+        if key.char.lowercased() == "r" {
+            showResults()
+            return
+        }
+
+        if key.char.lowercased() == "f" {
+            showSietch()
             return
         }
 
@@ -231,6 +323,10 @@ final class Game: DuneNode {
                     desert.move(.left)
                 }
             }
+            return
+        }
+
+        if sietchActive {
             return
         }
 
@@ -336,6 +432,10 @@ final class Game: DuneNode {
         if isOverlayActive("Fresk") {
             setNodeActive("Fresk", false)
         }
+        if isOverlayActive("Sietch") {
+            sietchActive = false
+            setNodeActive("Sietch", false)
+        }
         publishMainUI()
     }
 
@@ -352,7 +452,9 @@ final class Game: DuneNode {
             leftPanel: .bookClosed,
             rightPanel: .roomDirections,
             items: mainMenuItems,
-            directions: directions
+            directions: directions,
+            day: gameState.day,
+            phase: gameState.phase
         ))
     }
 

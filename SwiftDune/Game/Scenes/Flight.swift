@@ -80,12 +80,20 @@ final class Flight: DuneNode {
     override func onEnable() {
         dunesSprite = Sprite("DUNES.HSQ")
         sky = Sky()
+        currentTime = 0.0
+        frameCount = 0
+        flightSprites.removeAll()
+        contextBuffer.tag = 0
     }
     
     
     override func onDisable() {
         dunesSprite = nil
         sky = nil
+        currentTime = 0.0
+        frameCount = 0
+        flightSprites.removeAll()
+        contextBuffer.tag = 0
     }
     
     

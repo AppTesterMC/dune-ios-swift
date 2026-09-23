@@ -47,6 +47,8 @@ final class UI: DuneNode {
     // disabled before the room graph has been queried.
     private var directions: UIDirection = .all
     private var menuItems: [UInt16] = []
+    private var dayNumber = 1
+    private var phase: GamePhase = .dawn
     
     private var commands: Sentence?
     private var font: GameFont?
@@ -179,10 +181,10 @@ final class UI: DuneNode {
         }
       
         font.paletteIndex = lightColorIndex
-        font.render("1", rect: dayTextRect, buffer: buffer, alignment: .center, style: .small)
+        font.render(String(dayNumber), rect: dayTextRect, buffer: buffer, alignment: .center, style: .small)
       
-        uiSprite.drawFrame(74, x: 6, y: 184, buffer: buffer)
-        //uiSprite.drawFrame(75, x: 8, y: 188, buffer: buffer)
+        let phaseFrame: UInt16 = phase == .night ? 75 : 74
+        uiSprite.drawFrame(phaseFrame, x: 6, y: 184, buffer: buffer)
     }
     
     
@@ -234,6 +236,8 @@ final class UI: DuneNode {
         self.leftPanel = e.leftPanel
         self.rightPanel = e.rightPanel
         self.directions = e.directions
+        self.dayNumber = e.day
+        self.phase = e.phase
     }
 }
 
@@ -243,6 +247,8 @@ struct UIStateEventData {
     var rightPanel: UIRightPanel
     var items: [UInt16]
     var directions: UIDirection = .all
+    var day: Int = 1
+    var phase: GamePhase = .dawn
 }
 
 

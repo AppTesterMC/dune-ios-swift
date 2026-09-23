@@ -90,7 +90,9 @@ final class Book: DuneNode {
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .bookOpen,
             rightPanel: .rect,
-            items: menuItemsBook
+            items: menuItemsBook,
+            day: GameState.shared.day,
+            phase: GameState.shared.phase
         ))
     }
     

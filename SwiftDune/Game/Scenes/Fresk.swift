@@ -84,7 +84,9 @@ final class Fresk: DuneNode {
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .globe,
             rightPanel: .rect,
-            items: menuItems
+            items: menuItems,
+            day: GameState.shared.day,
+            phase: GameState.shared.phase
         ))
     }
 
@@ -93,8 +95,16 @@ final class Fresk: DuneNode {
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .globe,
             rightPanel: .rect,
-            items: menuItems
+            items: menuItems,
+            day: GameState.shared.day,
+            phase: GameState.shared.phase
         ))
+    }
+
+
+    func showResults() {
+        menuMode = .results
+        publishMenuState()
     }
     
     
@@ -158,6 +168,13 @@ final class Fresk: DuneNode {
         font.render(commands.sentence(at: 190), rect: DuneRect(166, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
         font.render(commands.sentence(at: 191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
         font.render(commands.sentence(at: 192), rect: DuneRect(28, 124, 264, 20), buffer: buffer, alignment: .center, style: .small)
+
+        let state = GameState.shared
+        font.paletteIndex = 250
+        font.render("DAY \(state.day)", rect: DuneRect(16, 4, 52, 10), buffer: buffer, style: .small)
+        font.render(state.phase.title, rect: DuneRect(252, 4, 52, 10), buffer: buffer, alignment: .center, style: .small)
+        font.render("\(state.spiceDensity)", rect: DuneRect(116, 53, 42, 10), buffer: buffer, alignment: .center, style: .small)
+        font.render(state.troopOrder.title, rect: DuneRect(166, 53, 96, 10), buffer: buffer, alignment: .center, style: .small)
     }
 
 
