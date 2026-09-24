@@ -184,6 +184,22 @@ enum TroopOrder: CaseIterable, Equatable {
     }
 }
 
+enum TroopOccupation: CaseIterable, Equatable {
+    case none
+    case spice
+    case army
+    case ecology
+
+    var title: String {
+        switch self {
+        case .none: return "NONE"
+        case .spice: return "SPICE"
+        case .army: return "ARMY"
+        case .ecology: return "ECOLOGY"
+        }
+    }
+}
+
 enum GameplayMilestone: String {
     case meetDuke = "MEET DUKE LETO"
     case findGurney = "FIND GURNEY"
@@ -245,6 +261,7 @@ final class GameState {
     private(set) var day: Int = 1
     private(set) var phase: GamePhase = .dawn
     private(set) var troopOrder: TroopOrder = .hold
+    private(set) var troopOccupation: TroopOccupation = .none
     private(set) var milestone: GameplayMilestone = .meetDuke
     private(set) var lastAction = "ARRIVAL"
 
@@ -273,6 +290,7 @@ final class GameState {
         day = 1
         phase = .dawn
         troopOrder = .hold
+        troopOccupation = .none
         milestone = .meetDuke
         lastAction = "ARRIVAL"
         spiceDensity = OriginalGameData.spiceDensity(for: 0)
@@ -308,6 +326,11 @@ final class GameState {
         guard let index = orders.firstIndex(of: troopOrder) else { return }
         troopOrder = orders[(index + 1) % orders.count]
         lastAction = "ORDER \(troopOrder.title)"
+    }
+
+    func setTroopOccupation(_ occupation: TroopOccupation) {
+        troopOccupation = occupation
+        lastAction = "OCCUPATION \(occupation.title)"
     }
 
     func setMilestone(_ milestone: GameplayMilestone, action: String) {

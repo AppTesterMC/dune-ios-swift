@@ -202,6 +202,9 @@ final class Fresk: DuneNode {
         font.render("ORDER \(state.troopOrder.title)",
                     rect: DuneRect(10, 30, 110, 10), buffer: buffer,
                     alignment: .left, style: .small)
+        font.render("ROLE \(state.troopOccupation.title)",
+                    rect: DuneRect(10, 58, 110, 10), buffer: buffer,
+                    alignment: .left, style: .small)
         font.render(state.milestone.rawValue,
                     rect: DuneRect(10, 44, 110, 10), buffer: buffer,
                     alignment: .left, style: .small)

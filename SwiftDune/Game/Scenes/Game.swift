@@ -50,6 +50,20 @@ final class Game: DuneNode {
         4: .jessica
     ]
     private let menuRect = DuneRect(92, 159, 136, 40)
+    // Exact English COMMAND1.HSQ records used by the original command menus.
+    private let sietchRootItems: [UInt16] = [133, 134, 135, 136, 141]
+    private let sietchOrderItems: [UInt16] = [67, 68, 69, 70, 71]
+    private let sietchOccupationItems: [UInt16] = [106, 107, 108, 71]
+    private let sietchMovementItems: [UInt16] = [77, 78, 79, 80, 81]
+
+    private enum SietchMenuMode {
+        case root
+        case orders
+        case occupation
+        case movement
+    }
+
+    private var sietchMenuMode: SietchMenuMode = .root
     private var musicStarted = false
     private var desertActive = false
     private var sietchActive = false
@@ -69,6 +83,7 @@ final class Game: DuneNode {
       musicStarted = false
       desertActive = false
       sietchActive = false
+      sietchMenuMode = .root
       gameState.reset()
       
       showRoom()
@@ -142,6 +157,7 @@ final class Game: DuneNode {
         setNodeActive("Palace", false)
         setNodeActive("DesertWalk", true, .background)
         setNodeActive("Flight", true, .foreground)
+        setNodeActive("UI", true, .foreground)
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .bookClosed,
             rightPanel: .roomDirections,
@@ -158,6 +174,7 @@ final class Game: DuneNode {
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
         showRoom()
+        setNodeActive("UI", true, .foreground)
         publishMainUI()
     }
 
@@ -180,27 +197,24 @@ final class Game: DuneNode {
         }
 
         sietchActive = true
+        sietchMenuMode = .root
         gameState.setMilestone(firstGameplaySietch ? .firstSietch : .recruitFremen,
                                action: firstGameplaySietch ? "GURNEY SIETCH" : "SIETCH LANDING")
         setNodeActive("Palace", false)
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
         setNodeActive("Sietch", true, .background)
-        EventManager.uiStateChangedEvent.notify(UIStateEventData(
-            leftPanel: .bookClosed,
-            rightPanel: .roomDirections,
-            items: mainMenuItems,
-            directions: [],
-            day: gameState.day,
-            phase: gameState.phase
-        ))
+        setNodeActive("UI", true, .foreground)
+        publishSietchUI(items: sietchRootItems)
     }
 
 
     private func closeSietch() {
         sietchActive = false
+        sietchMenuMode = .root
         setNodeActive("Sietch", false)
         showRoom()
+        setNodeActive("UI", true, .foreground)
         publishMainUI()
     }
 
@@ -223,7 +237,7 @@ final class Game: DuneNode {
         if findNode("Fresk") == nil {
           attachNode(Fresk())
         }
-        setNodeActive("Fresk", true)
+        setNodeActive("Fresk", true, .foreground)
     }
 
 
@@ -231,7 +245,7 @@ final class Game: DuneNode {
         if findNode("Fresk") == nil {
             attachNode(Fresk())
         }
-        setNodeActive("Fresk", true)
+        setNodeActive("Fresk", true, .foreground)
         (findNode("Fresk") as? Fresk)?.showResults()
     }
     
@@ -240,7 +254,7 @@ final class Game: DuneNode {
         if findNode("Book") == nil {
           attachNode(Book())
         }
-        setNodeActive("Book", true)
+        setNodeActive("Book", true, .foreground)
     }
 
 
@@ -277,8 +291,21 @@ final class Game: DuneNode {
         }
 
         if sietchActive {
+            if isOverlayActive("Fresk") {
+                if key.specialKey == .keyEscape || key.char.lowercased() == "m" {
+                    closeOverlay()
+                } else if let fresk = findNode("Fresk") as? Fresk {
+                    fresk.onKey(key)
+                }
+                return
+            }
+
             if key.specialKey == .keyEscape {
                 closeSietch()
+            } else if key.char.lowercased() == "m" {
+                showFresk()
+            } else if key.char.lowercased() == "b" {
+                showBook()
             }
             return
         }
@@ -359,6 +386,27 @@ final class Game: DuneNode {
         }
 
         if sietchActive {
+            if isOverlayActive("Fresk") {
+                if let fresk = findNode("Fresk") as? Fresk {
+                    if let action = fresk.menuAction(for: event) {
+                        switch action {
+                        case .close:
+                            closeOverlay()
+                        case .quit:
+                            engine.exitProgram(nil)
+                        case .handled:
+                            break
+                        }
+                    } else {
+                        fresk.onClick(event)
+                    }
+                }
+                return
+            }
+
+            if menuRect.contains(event.point) {
+                handleSietchMenuClick(event.point)
+            }
             return
         }
 
@@ -475,7 +523,117 @@ final class Game: DuneNode {
             sietchActive = false
             setNodeActive("Sietch", false)
         }
-        publishMainUI()
+        if sietchActive {
+            publishSietchUI(items: itemsForSietchMenu())
+        } else {
+            publishMainUI()
+        }
+    }
+
+
+    private func itemsForSietchMenu() -> [UInt16] {
+        switch sietchMenuMode {
+        case .root: return sietchRootItems
+        case .orders: return sietchOrderItems
+        case .occupation: return sietchOccupationItems
+        case .movement: return sietchMovementItems
+        }
+    }
+
+
+    private func publishSietchUI(items: [UInt16]) {
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed,
+            rightPanel: .roomDirections,
+            items: items,
+            directions: [],
+            day: gameState.day,
+            phase: gameState.phase
+        ))
+    }
+
+
+    private func handleSietchMenuClick(_ point: DunePoint) {
+        let index = Int((point.y - menuRect.y) / 8)
+        guard index >= 0 && index < 5 else { return }
+
+        switch sietchMenuMode {
+        case .root:
+            guard index < sietchRootItems.count else { return }
+            switch sietchRootItems[index] {
+            case 133:
+                gameState.setMilestone(.firstSietch, action: "TALK TO GURNEY")
+            case 134:
+                gameState.setMilestone(.firstSietch, action: "GURNEY COMES WITH PAUL")
+            case 135:
+                gameState.setMilestone(.firstSietch, action: "GURNEY STAYS HERE")
+            case 136:
+                sietchMenuMode = .orders
+                publishSietchUI(items: sietchOrderItems)
+            case 141:
+                showFresk()
+            default:
+                break
+            }
+        case .orders:
+            guard index < sietchOrderItems.count else { return }
+            switch sietchOrderItems[index] {
+            case 67:
+                gameState.setMilestone(.firstSietch, action: "MODIFY EQUIPMENT")
+            case 68:
+                sietchMenuMode = .occupation
+                publishSietchUI(items: sietchOccupationItems)
+            case 69:
+                sietchMenuMode = .movement
+                publishSietchUI(items: sietchMovementItems)
+            case 70:
+                gameState.setMilestone(.firstSietch, action: "NEXT TROOP")
+            case 71:
+                sietchMenuMode = .root
+                publishSietchUI(items: sietchRootItems)
+            default:
+                break
+            }
+        case .occupation:
+            guard index < sietchOccupationItems.count else { return }
+            switch sietchOccupationItems[index] {
+            case 106:
+                gameState.setTroopOccupation(.spice)
+                sietchMenuMode = .orders
+                publishSietchUI(items: sietchOrderItems)
+            case 107:
+                gameState.setTroopOccupation(.army)
+                sietchMenuMode = .orders
+                publishSietchUI(items: sietchOrderItems)
+            case 108:
+                gameState.setTroopOccupation(.ecology)
+                sietchMenuMode = .orders
+                publishSietchUI(items: sietchOrderItems)
+            case 71:
+                sietchMenuMode = .orders
+                publishSietchUI(items: sietchOrderItems)
+            default:
+                break
+            }
+        case .movement:
+            guard index < sietchMovementItems.count else { return }
+            switch sietchMovementItems[index] {
+            case 77:
+                gameState.setMilestone(.firstSietch, action: "CHANGE DESTINATION")
+            case 78:
+                gameState.setMilestone(.firstSietch, action: "FLYING ORNI")
+                closeSietch()
+                showDesert(destinationCode: gameState.currentLocation)
+            case 79:
+                gameState.setMilestone(.firstSietch, action: "RIDING WORM")
+                closeSietch()
+                showDesert(destinationCode: gameState.currentLocation)
+            case 80, 81:
+                gameState.setMilestone(.firstSietch, action: "ADD DESTINATION")
+            default:
+                break
+            }
+        }
     }
 
 
