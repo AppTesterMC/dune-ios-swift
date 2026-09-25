@@ -214,6 +214,14 @@ final class Conversation {
 
     func endAfterLine() { endAfter = true }
 
+    /// Runs the shown line's action now (a verb reads the gate right after
+    /// the answer appears, seg000:95f7).
+    func finishPending() {
+        guard pendingFinish else { return }
+        finishEntry()
+        if single || endAfter { answered = true }
+    }
+
     private func findEntry() -> Bool {
         let dialogue = story.dialogue
         while true {
@@ -293,6 +301,17 @@ final class Story {
     }
 
     var phase: UInt8 { world.b(World.phase) }
+
+    /// Does `character` have a line in `list` whose condition holds now?
+    func hasLine(character: Int, list: Int, mask: UInt8 = 0x80) -> Bool {
+        var offset = dialogue.listOffset(character: character, list: list)
+        while let entry = dialogue.entry(at: offset) {
+            let skip = entry.said && !entry.repeatable && (entry.flags & mask) != 0
+            if !skip && conditions.evaluate(entry.condition, world) { return true }
+            offset += 4
+        }
+        return false
+    }
 
     /// setGamePhase: phases only go up; run the triggers, then the phase's
     /// callback when it is a multiple of 4 up to 0x6C.

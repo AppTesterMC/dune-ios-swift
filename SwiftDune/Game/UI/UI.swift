@@ -135,8 +135,11 @@ final class UI: DuneNode {
         // drawing the room buttons there leaves two stray squares over the
         // left-bottom corner.
         if leftPanel == .bookClosed {
-            uiSprite.drawFrame(64, x: 35, y: 182, buffer: buffer)
-            uiSprite.drawFrame(64, x: 58, y: 182, buffer: buffer)
+            // Companion slots ds:1152/1153 (record byte 14); ICONES 0x41 + id,
+            // 64 = empty box.
+            let slots = [World.shared.b(0x1152), World.shared.b(0x1153)]
+            uiSprite.drawFrame(slots[0] == 0xFF ? 64 : 0x41 + UInt16(slots[0]), x: 35, y: 182, buffer: buffer)
+            uiSprite.drawFrame(slots[1] == 0xFF ? 64 : 0x41 + UInt16(slots[1]), x: 58, y: 182, buffer: buffer)
         }
 
         // Right part

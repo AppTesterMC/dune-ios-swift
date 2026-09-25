@@ -726,6 +726,52 @@ final class World {
     }
 
 
+    // MARK: Companions and rooms
+
+    /// The record now stands where Paul is (STAY HERE, sent home).
+    func settleCharacter(_ index: Int) {
+        let o = characterOffset(index)
+        vars[o] = b(4); vars[o + 1] = b(5); vars[o + 2] = b(6); vars[o + 3] = b(7)
+    }
+
+    /// Two companion slots; a third companion sends the first home.
+    /// Returns the character sent home, if any.
+    func addCompanion(_ index: Int) -> Int? {
+        let id = vars[characterOffset(index) + 14]
+        let a = ds(0x1152), bb = ds(0x1153)
+        if vars[a] == id || vars[bb] == id { return nil }
+        if vars[a] == 0xFF { vars[a] = id; return nil }
+        if vars[bb] == 0xFF { vars[bb] = id; return nil }
+        let dismissed = Int(vars[a])
+        vars[a] = vars[bb]
+        vars[bb] = id
+        return dismissed
+    }
+
+    func removeCompanion(_ index: Int) {
+        let id = vars[characterOffset(index) + 14]
+        let a = ds(0x1152), bb = ds(0x1153)
+        if vars[bb] == id {
+            vars[bb] = 0xFF
+        } else if vars[a] == id {
+            vars[a] = vars[bb]
+            vars[bb] = 0xFF
+        }
+    }
+
+    /// Entering a room marks the place visited (status 0x10); a sietch
+    /// counts in ds:25; ds:26 = 0xFF on the first visit.
+    func markVisited() {
+        let o = Location.tableOffset + currentLocation * Location.recordSize + 10
+        guard o < World.size else { return }
+        if vars[o] & 0x10 == 0 {
+            vars[o] |= 0x10
+            setB(0x26, 0xFF)
+            if placeType <= Location.sietchMax { setB(0x25, b(0x25) &+ 1) }
+        }
+    }
+
+
     // MARK: Clock
 
     /// Day shown on the panel: ((t + 3) >> 4) % 365 + 1.

@@ -265,7 +265,7 @@ final class Game: DuneNode {
         lastDialogueCharacter = character
         dialogueCharacter = character
         dialoguePhraseOverride = nil
-        dialogueMenuItems = context == .troop ? [66, 68, 67, 69, 72] : [133, 134, 138, 137]
+        dialogueMenuItems = context == .troop ? [66, 68, 67, 69, 72] : talkRows(character)
         showRoomOrSietch()
         publishDialogueUI()
     }
@@ -339,6 +339,87 @@ final class Game: DuneNode {
         case .harah: return World.harah
         case .smuggler: return World.smuggler
         case .fremen1, .fremen2, .fremen3: return World.fremen
+        default: return nil
+        }
+    }
+
+
+    /// The talk rows (seg000:95xx): TALK TO ME; COME WITH ME, or STAY HERE
+    /// for a companion; STOP TALKING.
+    private func talkRows(_ character: DuneCharacter) -> [UInt16] {
+        guard let number = characterNumber(character), number < World.fremen else { return [133, 137] }
+        let with = world.w(World.personsWith) & (UInt16(1) << UInt16(number)) != 0
+        return [133, with ? 135 : 134, 137]
+    }
+
+
+    /// COME WITH ME / STAY HERE: the speaker's list 5 or 6 answer (mask
+    /// 0x20, one line); unless the answer refused (action 2) the travelling
+    /// bit ds:10 flips. Port of ScummVM GameScreen::companionVerb.
+    private func companionVerb(_ character: DuneCharacter) {
+        guard let number = characterNumber(character), number < World.fremen else { return }
+        let bit = UInt16(1) << UInt16(number)
+        let with = world.w(World.personsWith) & bit != 0
+        let verb = Conversation(story: story, character: number, list: with ? 6 : 5,
+                                mask: 0x20, oneList: true, single: true)
+        conversation = verb
+        showNextConversationPage()
+        verb.finishPending()
+        world.setB(0x23, 0)
+
+        if verb.gate != 0 {
+            if with {
+                world.setW(World.personsWith, world.w(World.personsWith) & ~bit)
+                world.settleCharacter(number)
+                world.removeCompanion(number)
+            } else {
+                world.setW(World.personsWith, world.w(World.personsWith) | bit)
+                if let home = world.addCompanion(number), home < 16 {
+                    world.setW(World.personsWith, world.w(World.personsWith) & ~(UInt16(1) << UInt16(home)))
+                    world.settleCharacter(home)
+                }
+            }
+        }
+        dialogueMenuItems = talkRows(character)
+        publishDialogueUI()
+    }
+
+
+    /// Entering a room (seg000:35b4): ds:23 = 5, the place is visited, and
+    /// the first person here with a list-4 line whose condition holds says it.
+    private func roomEntryScan() {
+        world.setB(0x23, 5)
+        world.markVisited()
+        defer { world.setB(0x23, 0) }
+        for person in world.peopleInRoom() {
+            let group = min(person, World.fremenChief)
+            guard story.hasLine(character: group, list: 4),
+                  let character = duneCharacter(number: person) else { continue }
+            dialogueContext = sietchActive ? .sietch : .palace
+            lastDialogueCharacter = character
+            dialogueCharacter = character
+            dialogueMenuItems = talkRows(character)
+            showRoomOrSietch()
+            conversation = Conversation(story: story, character: group, list: 4, mask: 0x80, oneList: true)
+            showNextConversationPage()
+            return
+        }
+    }
+
+
+    private func duneCharacter(number: Int) -> DuneCharacter? {
+        switch number {
+        case World.leto: return .leto
+        case World.jessica: return .jessica
+        case World.thufir: return .thufir
+        case World.duncan: return .duncan
+        case World.gurney: return .gurney
+        case World.stilgar: return .stilgar
+        case World.kynes: return .liet
+        case World.chani: return .chani
+        case World.harah: return .harah
+        case World.smuggler: return .smuggler
+        case World.fremen...: return .fremen1
         default: return nil
         }
     }
@@ -446,13 +527,13 @@ final class Game: DuneNode {
                 gameState.acceptSpiceShipment()
                 dialoguePhraseOverride = 259 // The spice has been shipped...
                 dialogueContext = sietchActive ? .sietch : .palace
-                dialogueMenuItems = [133, 134, 138, 137]
+                dialogueMenuItems = talkRows(dialogueCharacter ?? .none)
                 showDialogueLine()
             case 227: // REFUSE
                 gameState.refuseSpiceShipment()
                 dialoguePhraseOverride = 268 // Don't tell me that you don't want to send...
                 dialogueContext = sietchActive ? .sietch : .palace
-                dialogueMenuItems = [133, 134, 138, 137]
+                dialogueMenuItems = talkRows(dialogueCharacter ?? .none)
                 showDialogueLine()
             case 228: // ARGUE
                 gameState.argueSpiceShipment()
@@ -479,12 +560,10 @@ final class Game: DuneNode {
                     showDialogueLine()
                 }
             }
-        case 134:
-            gameState.setMilestone(.firstSietch, action: "COME WITH ME")
-            showDialogueLine()
-        case 135:
-            gameState.setMilestone(.firstSietch, action: "STAY HERE")
-            showDialogueLine()
+        case 134, 135:
+            if let character = dialogueCharacter {
+                companionVerb(character)
+            }
         case 136:
             dialogueContext = .troop
             dialogueMenuItems = [66, 68, 67, 69, 72]
@@ -558,6 +637,7 @@ final class Game: DuneNode {
             world.setRoom(room)
             publishSietchRoom()
             publishSietchUI(items: sietchRootCharacterItems())
+            roomEntryScan()
         case .leave:
             closeSietch()
         default:
@@ -1130,6 +1210,7 @@ final class Game: DuneNode {
             currentGameRoom = room
             showRoom()
             publishMainUI()
+            roomEntryScan()
         case .leave:
             // 252-254 leave the place. The original opens the flat map to
             // choose a destination; until the map is ported this keeps the
