@@ -69,6 +69,7 @@
 		0699D2772A93C702006287E0 /* Resource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D2762A93C702006287E0 /* Resource.swift */; };
 		0699D27E2A93D245006287E0 /* DuneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D27D2A93D245006287E0 /* DuneEngine.swift */; };
 		FD54F887CC1F14A06117DB51 /* DevHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */; };
+		AE9E7C9518AB40DADF6C2F81 /* Dialogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA721F44129D1B6089145CF6 /* Dialogue.swift */; };
 		859296E04BE5C20B5B26EA26 /* GameText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F1FF1659697B1DD8B481D8 /* GameText.swift */; };
 		6EDCE71D389E0FB953336367 /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB800CCA8E02398EE23470E /* World.swift */; };
 		069B74792D1822660071E68C /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069B74782D1822660071E68C /* Event.swift */; };
@@ -118,6 +119,7 @@
 		06CA2BBE2C7B350F00B47D13 /* Globe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DC67A22BE2320B0067DFEA /* Globe.swift */; };
 		06CA2BBF2C7B350F00B47D13 /* DuneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D27D2A93D245006287E0 /* DuneEngine.swift */; };
 		EE378917B4B4C3E7EAADEF81 /* DevHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */; };
+		1A4A4FCCF9D85051D8341B3A /* Dialogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA721F44129D1B6089145CF6 /* Dialogue.swift */; };
 		17E64621131E34DC97ABCAE4 /* GameText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78F1FF1659697B1DD8B481D8 /* GameText.swift */; };
 		74DFC728B094B1F022D1677D /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAB800CCA8E02398EE23470E /* World.swift */; };
 		06CA2BC02C7B350F00B47D13 /* Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062A77672B53FE9C001CA514 /* Types.swift */; };
@@ -202,6 +204,7 @@
 		0699D2762A93C702006287E0 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
 		0699D27D2A93D245006287E0 /* DuneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneEngine.swift; sourceTree = "<group>"; };
 		5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevHarness.swift; sourceTree = "<group>"; };
+		CA721F44129D1B6089145CF6 /* Dialogue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/Dialogue.swift; sourceTree = SOURCE_ROOT; };
 		78F1FF1659697B1DD8B481D8 /* GameText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/GameText.swift; sourceTree = SOURCE_ROOT; };
 		DAB800CCA8E02398EE23470E /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/World.swift; sourceTree = SOURCE_ROOT; };
 		069B74782D1822660071E68C /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
@@ -414,6 +417,7 @@
 				063549442B1D04E200885655 /* Resources */,
 				0699D27D2A93D245006287E0 /* DuneEngine.swift */,
 				5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */,
+				CA721F44129D1B6089145CF6 /* Dialogue.swift */,
 				78F1FF1659697B1DD8B481D8 /* GameText.swift */,
 				DAB800CCA8E02398EE23470E /* World.swift */,
 				069B74782D1822660071E68C /* Event.swift */,
@@ -618,6 +622,7 @@
 				06AB96D52BEB7DC300482823 /* Attack.swift in Sources */,
 				0699D27E2A93D245006287E0 /* DuneEngine.swift in Sources */,
 				FD54F887CC1F14A06117DB51 /* DevHarness.swift in Sources */,
+				AE9E7C9518AB40DADF6C2F81 /* Dialogue.swift in Sources */,
 				859296E04BE5C20B5B26EA26 /* GameText.swift in Sources */,
 				6EDCE71D389E0FB953336367 /* World.swift in Sources */,
 				06892D542C1EE62700B08B22 /* DesertWalk.swift in Sources */,
@@ -704,6 +709,7 @@
 				06CA2BBE2C7B350F00B47D13 /* Globe.swift in Sources */,
 				06CA2BBF2C7B350F00B47D13 /* DuneEngine.swift in Sources */,
 				EE378917B4B4C3E7EAADEF81 /* DevHarness.swift in Sources */,
+				1A4A4FCCF9D85051D8341B3A /* Dialogue.swift in Sources */,
 				17E64621131E34DC97ABCAE4 /* GameText.swift in Sources */,
 				74DFC728B094B1F022D1677D /* World.swift in Sources */,
 				06CA2BC02C7B350F00B47D13 /* Types.swift in Sources */,

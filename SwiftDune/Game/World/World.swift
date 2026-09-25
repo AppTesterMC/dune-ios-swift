@@ -583,26 +583,32 @@ final class World {
 
     // MARK: Story phase
 
-    /// ds:2A. Setting it runs the phase callbacks of every phase value
-    /// passed (the original's table at seg000:1011..11cb, one entry per
-    /// multiple of 4). Returns the callbacks' scripted scene / vision ids
-    /// (CD code offsets), 0 when none; they are not played yet.
+    /// The scripted scene for dialogue event 3, by phase (seg000:a1f7).
+    var phaseSceneScript: UInt16 {
+        let p = b(World.phase)
+        return p < 0x14 ? 0x12F8 : p < 0x18 ? 0x134F : p < 0x30 ? 0x1370 : 0x12DB
+    }
+
+    /// Jessica's training (dialogue event 8): the contact range grows.
     @discardableResult
-    func setPhase(_ newPhase: UInt8) -> (cutscene: UInt16, vision: UInt16) {
-        let old = b(World.phase)
-        guard newPhase > old else { return (0, 0) }
-        setB(World.phase, newPhase)
-        var result: (cutscene: UInt16, vision: UInt16) = (0, 0)
-        var p = Int(old) + 1
-        while p <= Int(newPhase) {
-            if p % 4 == 0 {
-                let r = phaseCallback(UInt8(p))
-                if r.cutscene != 0 { result.cutscene = r.cutscene }
-                if r.vision != 0 { result.vision = r.vision }
-            }
-            p += 1
+    func raiseContactRange() -> Int {
+        var range = w(0x1176)
+        if b(0x0A) & 2 != 0 {
+            addCharisma(0x28)
+            range = 0xFFCE &+ 0x14
+        } else if range == 1 {
+            addCharisma(10)
+            range = 10 + 0x14
+        } else {
+            range &+= 0x14
         }
-        return result
+        setW(0x1176, range)
+        setB(0xD5, range >= 100 ? 0 : UInt8(0x80 - Int(range & 0xFF) / 6))
+        return Int(range)
+    }
+
+    func setCharacterByte(_ index: Int, _ byte: Int, _ value: UInt8) {
+        vars[characterOffset(index) + byte] = value
     }
 
     private func characterOffset(_ index: Int) -> Int { World.characterTable + index * World.characterSize }
@@ -624,8 +630,9 @@ final class World {
         setB(World.charisma, UInt8(min(200, Int(b(World.charisma)) + amount)))
     }
 
-    /// Port of ScummVM World::phaseCallback (state changes only).
-    private func phaseCallback(_ phase: UInt8) -> (cutscene: UInt16, vision: UInt16) {
+    /// Port of ScummVM World::phaseCallback (state changes only). Returns
+    /// the scripted scene / vision it asks for (CD code offsets).
+    func phaseCallback(_ phase: UInt8) -> (cutscene: UInt16, vision: UInt16) {
         var cutscene: UInt16 = 0
         var vision: UInt16 = 0
         func v(_ cd: Int) -> Int { ds(cd) }

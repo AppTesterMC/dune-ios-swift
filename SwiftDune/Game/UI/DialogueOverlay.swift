@@ -14,6 +14,7 @@ final class DialogueOverlay: DuneNode {
     private var font: GameFont?
     private var phrases: Sentence?
     private var phraseIndex: UInt16 = 0
+    private var text: String?
     private var speaker = ""
 
     init() {
@@ -35,6 +36,11 @@ final class DialogueOverlay: DuneNode {
     override func onParamsChange() {
         if let index = params["phraseIndex"] as? Int {
             phraseIndex = UInt16(truncatingIfNeeded: index)
+            text = nil
+        }
+        if let text = params["text"] as? String {
+            // A page already expanded by the dialogue engine.
+            self.text = text
         }
         if let speaker = params["speaker"] as? String {
             self.speaker = speaker
@@ -56,7 +62,7 @@ final class DialogueOverlay: DuneNode {
             font.render(speaker, rect: DuneRect(6, 134, 90, 8), buffer: buffer,
                         alignment: .left, style: .small)
         }
-        font.render(GameText.shared.phrase(Int(phraseIndex)).replacingOccurrences(of: "\u{FE}", with: " "),
+        font.render(text ?? GameText.shared.phrase(Int(phraseIndex)).replacingOccurrences(of: "\u{FE}", with: " "),
                     rect: DuneRect(6, 143, 308, 21), buffer: buffer,
                     alignment: .left, style: .small)
     }

@@ -285,7 +285,9 @@ final class GameState {
     // The Swift slice does not evaluate CONDIT.HSQ yet, but keeping the same
     // byte milestones makes the visible branches line up with the original
     // event callbacks and with dune-re's phase table.
-    private(set) var storyPhase: UInt8 = 0
+    /// ds:2A, owned by the data segment; only dialogue actions, phase
+    /// callbacks and discoveries change it (Story.setGamePhase).
+    var storyPhase: UInt8 { World.shared.b(World.phase) }
     private(set) var charisma: UInt8 = 0
     private(set) var prospectorFound = false
     private(set) var prospectorLocation = 2 // Carthag-Timin in the original troop table
@@ -330,7 +332,6 @@ final class GameState {
         troopOccupation = .none
         milestone = .meetDuke
         lastAction = "ARRIVAL"
-        storyPhase = 0
         charisma = 0
         prospectorFound = false
         prospectorLocation = 2
@@ -408,14 +409,8 @@ final class GameState {
     }
 
     func advanceStory(to phase: UInt8, action: String) {
-        storyPhase = max(storyPhase, phase)
-        let world = World.shared
-        world.setPhase(storyPhase)
-        // Stand-in until the DIALOGUE.HSQ actions are ported: in the original
-        // Duncan reaches palace room 4 through Leto's phase-1 conversation.
-        if storyPhase >= 0x01 && world.character(World.duncan).locationPlusOne == 0xFF {
-            world.moveCharacter(World.duncan, room: 4, location: 0)
-        }
+        // Kept for the milestone text only: the phase itself now moves
+        // through DIALOGUE.HSQ actions 11/12 (Story), as in the original.
         lastAction = action
         if phase >= 0x01 && milestone == .meetDuke {
             milestone = .findGurney
@@ -424,8 +419,8 @@ final class GameState {
 
     func findProspectors() {
         prospectorFound = true
-        storyPhase = max(storyPhase, 0x05)
-        World.shared.setPhase(storyPhase)
+        // Phase 5 is what enables FIND PROSPECTORS in the original; it is
+        // not set by finding them.
         milestone = .prospectorsFound
         lastAction = "PROSPECTOR AT CARTHAG-TIMIN"
     }

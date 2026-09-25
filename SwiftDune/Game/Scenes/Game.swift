@@ -24,6 +24,9 @@ final class Game: DuneNode {
     private var dialogueMenuItems: [UInt16] = []
     private var dialogueContext: DialogueContext = .palace
     private var dialoguePhraseOverride: Int?
+    /// The DIALOGUE.HSQ conversation in progress (TALK TO ME).
+    private var conversation: Conversation?
+    private let story = Story.shared
 
     private enum DialogueContext: Equatable {
         case palace
@@ -58,6 +61,7 @@ final class Game: DuneNode {
     override func onEnable() {
       engine.palette.clear()
       world.reset() // new game: the executable's data, Paul in the throne room
+      conversation = nil
       if let time = DevHarness.shared.startTime {
           world.setW(World.gameTime, time)
       }
@@ -72,6 +76,7 @@ final class Game: DuneNode {
       sietchActive = false
       sietchMenuMode = .root
       gameState.reset()
+      story.newGame()
       
       showRoom()
       showUI()
@@ -320,6 +325,55 @@ final class Game: DuneNode {
     }
 
 
+    /// Character number of the original tables (DIALOGUE order).
+    private func characterNumber(_ character: DuneCharacter) -> Int? {
+        switch character {
+        case .leto: return World.leto
+        case .jessica: return World.jessica
+        case .thufir: return World.thufir
+        case .duncan: return World.duncan
+        case .gurney: return World.gurney
+        case .stilgar: return World.stilgar
+        case .liet: return World.kynes
+        case .chani: return World.chani
+        case .harah: return World.harah
+        case .smuggler: return World.smuggler
+        case .fremen1, .fremen2, .fremen3: return World.fremen
+        default: return nil
+        }
+    }
+
+
+    /// TALK TO ME: lists 0-3 of the speaker, mask 0x80.
+    private func startConversation(with character: DuneCharacter) -> Bool {
+        guard let number = characterNumber(character) else { return false }
+        conversation = Conversation(story: story, character: number, list: 0)
+        return showNextConversationPage()
+    }
+
+
+    /// Shows the next page; false when the conversation has ended.
+    @discardableResult
+    private func showNextConversationPage() -> Bool {
+        guard let conversation = conversation, let page = conversation.next() else {
+            self.conversation = nil
+            setNodeActive("Dialogue", false)
+            // A line may have moved the story (phase, doors, people).
+            publishDialogueUI()
+            return false
+        }
+        if findNode("Dialogue") == nil {
+            attachNode(DialogueOverlay())
+        }
+        findNode("Dialogue")?.params = [
+            "text": page,
+            "speaker": dialogueCharacterName(dialogueCharacter ?? .none)
+        ]
+        setNodeActive("Dialogue", true, .foreground)
+        return true
+    }
+
+
     private func showDialogueLine() {
         if findNode("Dialogue") == nil {
             attachNode(DialogueOverlay())
@@ -414,23 +468,16 @@ final class Game: DuneNode {
         switch item {
         case 133:
             if let character = dialogueCharacter {
-                if character == .duncan {
+                if character == .duncan && gameState.shipmentPending && gameState.storyPhase >= 0x15 {
+                    // Duncan's shipment bargaining is not driven by the
+                    // dialogue data yet (actions 4/8/9/15 for Duncan).
                     gameState.beginDuncanShipmentConversation()
-                    if gameState.shipmentPending && gameState.storyPhase >= 0x15 {
-                        dialogueContext = .shipment
-                        dialogueMenuItems = [226, 227, 228]
-                    } else {
-                        dialogueContext = sietchActive ? .sietch : .palace
-                        dialogueMenuItems = [133, 134, 138, 137]
-                    }
-                } else if character == .leto {
-                    gameState.advanceStory(to: 0x01, action: "LETO: FIND GURNEY")
-                } else if character == .jessica {
-                    gameState.advanceStory(to: 0x01, action: "JESSICA: FIND GURNEY")
-                } else if character == .gurney {
-                    gameState.findProspectors()
+                    dialogueContext = .shipment
+                    dialogueMenuItems = [226, 227, 228]
+                    showDialogueLine()
+                } else if !startConversation(with: character) {
+                    showDialogueLine()
                 }
-                showDialogueLine()
             }
         case 134:
             gameState.setMilestone(.firstSietch, action: "COME WITH ME")
@@ -610,7 +657,11 @@ final class Game: DuneNode {
         }
 
         if isOverlayActive("Dialogue") {
-            closeDialogueLine()
+            if conversation != nil {
+                showNextConversationPage()
+            } else {
+                closeDialogueLine()
+            }
             return
         }
 
@@ -759,7 +810,11 @@ final class Game: DuneNode {
         }
 
         if isOverlayActive("Dialogue") {
-            closeDialogueLine()
+            if conversation != nil {
+                showNextConversationPage()
+            } else {
+                closeDialogueLine()
+            }
             return
         }
 
