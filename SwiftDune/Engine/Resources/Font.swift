@@ -132,7 +132,9 @@ final class GameFont {
         let space = style == .small ? min(6, spaceWidth) : spaceWidth
         func lineWidth(_ line: String) -> Int {
             let words = line.split(separator: " ")
-            return words.reduce(0) { $0 + self.width(for: String($1), style: style) } + space * max(0, words.count - 1)
+            // render() keeps a word on the line while the words so far plus
+            // one space per word stay under the width.
+            return words.reduce(0) { $0 + self.width(for: String($1), style: style) } + space * words.count
         }
         var result = text
         while !result.isEmpty && lineWidth(result) >= width {
