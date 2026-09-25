@@ -51,6 +51,11 @@ final class Game: DuneNode {
     private var musicStarted = false
     private var desertActive = false
     private var sietchActive = false
+    /// The flat map is open (SEE DUNE MAP, or choosing where to fly).
+    private var mapActive = false
+    /// Flying to a place: destination index and arrival time.
+    private var flight: (destination: Int, cells: Int, arrival: TimeInterval)?
+    private var clock: TimeInterval = 0
     private let gameState = GameState.shared
     
     init() {
@@ -103,7 +108,9 @@ final class Game: DuneNode {
             "salRoom": salIndex,
             "gameRoomID": currentGameRoom,
             "sheet": world.sheet(for: record),
-            "people": world.peopleInRoom()
+            "people": world.peopleInRoom(),
+            "salFile": World.salFile(world.placeType),
+            "outdoor": world.isOutdoors(record, placeType: world.placeType)
         ]
         var params = roomParams
         if let dialogueCharacter = dialogueCharacter {
@@ -140,13 +147,157 @@ final class Game: DuneNode {
             publishSietchUI(items: sietchRootCharacterItems())
             return
         }
-        if world.placeType != Location.palace || world.currentRoomRecord() == nil {
-            // Villages, fortresses and the desert are not ported yet.
-            engine.logger.log(.warn, "showCurrentPlace: place type \(world.placeType) not ported, showing the palace front")
+        sietchActive = false
+        setNodeActive("Sietch", false)
+        if world.currentRoomRecord() == nil {
+            engine.logger.log(.warn, "showCurrentPlace: no room \(world.room) at place type \(world.placeType), showing the palace front")
             world.setPosition(location: 0, room: 1)
         }
         showRoom()
         publishMainUI()
+    }
+
+
+    // MARK: - Flat map and travel
+
+    private var flatMap: FlatMap {
+        if let map = findNode("FlatMap") as? FlatMap { return map }
+        let map = FlatMap()
+        attachNode(map)
+        return map
+    }
+
+    /// SEE DUNE MAP (caption: the DUNE MAP box) or leaving a place (select).
+    private func openMap(select: Bool, caption: Bool) {
+        dialogueCharacter = nil
+        mapActive = true
+        let map = flatMap
+        map.params = ["select": select, "caption": caption]
+        setNodeActive("FlatMap", true, .background)
+        publishMapUI()
+    }
+
+    private func closeMap() {
+        mapActive = false
+        setNodeActive("FlatMap", false)
+        showCurrentPlace()
+    }
+
+    private enum MapRow { case exit, fly, takeOrnithopter }
+
+    /// map_setup_main_menu rows that are ported: EXIT MAPS, GO THERE FLYING
+    /// AN ORNI once a place is chosen, TAKE AN ORNITHOPTER (greyed rows
+    /// are left out until rows can be greyed).
+    private func mapRows() -> [(MapRow, UInt16)] {
+        var rows: [(MapRow, UInt16)] = []
+        let text = GameText.shared
+        if let exit = text.findCommand("EXIT MAPS") { rows.append((.exit, UInt16(exit))) }
+        let map = flatMap
+        if map.selecting {
+            if let destination = map.destination, destination != world.currentLocation,
+               let fly = text.findCommand("GO THERE FLYING AN ORNI") {
+                rows.append((.fly, UInt16(fly)))
+            }
+        } else if world.location(world.currentLocation).ornithopters > 0 || world.placeType == Location.palace,
+                  let take = text.findCommand("TAKE AN ORNITHOPTER") {
+            rows.append((.takeOrnithopter, UInt16(take)))
+        }
+        return rows
+    }
+
+    private func publishMapUI() {
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .map,
+            rightPanel: .mapDirections,
+            items: mapRows().map { $0.1 },
+            directions: [],
+            day: gameState.day,
+            phase: gameState.phase
+        ))
+    }
+
+    private func handleMapClick(_ point: DunePoint) {
+        let map = flatMap
+        if let arrow = FlatMap.arrow(at: point) {
+            if arrow == (0, 0) {
+                map.centreOn(world.currentLocation)
+            } else {
+                map.scroll(dx: arrow.dx, dy: arrow.dy)
+            }
+            return
+        }
+        if map.tap(point) {
+            publishMapUI()
+            return
+        }
+        guard menuRect.contains(point) else { return }
+        let rows = mapRows()
+        let index = Int((point.y - menuRect.y) / 8)
+        guard index >= 0 && index < rows.count else { return }
+        switch rows[index].0 {
+        case .exit:
+            closeMap()
+        case .takeOrnithopter:
+            map.params = ["select": true, "caption": false]
+            publishMapUI()
+        case .fly:
+            if let destination = map.destination {
+                fly(to: destination)
+            }
+        }
+    }
+
+    /// Take off from room 1 (one ornithopter less here) and fly: one cell
+    /// every 3,834 ms; a tap or SKIP TO DESTINATION lands at once.
+    private func fly(to destination: Int) {
+        mapActive = false
+        setNodeActive("FlatMap", false)
+        setNodeActive("Palace", false)
+        setNodeActive("Sietch", false)
+        sietchActive = false
+
+        let from = world.location(world.currentLocation), to = world.location(destination)
+        let cells = world.cellDistance(fromLatitude: Int(from.latitude), longitude: from.longitude,
+                                       toLatitude: Int(to.latitude), longitude: to.longitude)
+        world.adjustOrnithopters(world.currentLocation, -1)
+        world.setRoom(1)
+        flight = (destination, cells, clock + Double(max(1, cells)) * 3.834)
+        engine.logger.log(.info, "Flight: \(world.currentLocation) -> \(destination), \(cells) cells")
+
+        if findNode("DesertWalk") == nil { attachNode(DesertWalk()) }
+        if findNode("Flight") == nil { attachNode(Flight()) }
+        findNode("DesertWalk")?.params = ["interactive": false, "destinationCode": destination, "travelStep": 0]
+        findNode("Flight")?.params = [
+            "dayMode": gameState.phase.lightMode,
+            "destinationCode": destination,
+            "duration": TimeInterval.greatestFiniteMagnitude
+        ]
+        setNodeActive("DesertWalk", true, .background)
+        setNodeActive("Flight", true, .background)
+        var items: [UInt16] = []
+        if let skip = GameText.shared.findCommand("SKIP TO DESTINATION") { items.append(UInt16(skip)) }
+        if let change = GameText.shared.findCommand("CHANGE DESTINATION") { items.append(UInt16(change)) }
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .map, rightPanel: .rect, items: items, directions: [],
+            day: gameState.day, phase: gameState.phase))
+    }
+
+    /// Land: the place is discovered, Paul in its room 1 with one more
+    /// ornithopter, a period per 16 cells has passed, then the room-entry
+    /// lines.
+    private func arrive() {
+        guard let trip = flight else { return }
+        flight = nil
+        setNodeActive("DesertWalk", false)
+        setNodeActive("Flight", false)
+        gameState.passPeriods(trip.cells / 16)
+        world.discover(trip.destination)
+        world.setPosition(location: trip.destination, room: 1)
+        world.adjustOrnithopters(trip.destination, 1)
+        gameState.setLocation(trip.destination)
+        engine.logger.log(.info, "Flight: landed at \(trip.destination) (\(world.locationName(trip.destination, GameText.shared.command)))")
+        showCurrentPlace()
+        roomEntryScan()
     }
 
 
@@ -667,7 +818,7 @@ final class Game: DuneNode {
             publishSietchUI(items: sietchRootCharacterItems())
             roomEntryScan()
         case .leave:
-            closeSietch()
+            openMap(select: true, caption: false)
         default:
             break
         }
@@ -691,8 +842,12 @@ final class Game: DuneNode {
         // menu holds it (game_suspend_count, seg000:ef6a).
         let held = dialogueCharacter != nil || isOverlayActive("Dialogue") || isOverlayActive("Book")
             || isOverlayActive("Fresk") || isOverlayActive("Communication")
-        if !held {
+        if !held && flight == nil {
             gameState.advance(elapsedTime)
+        }
+        clock += elapsedTime
+        if let flight = flight, clock >= flight.arrival {
+            arrive()
         }
         super.update(elapsedTime)
     }
@@ -775,6 +930,31 @@ final class Game: DuneNode {
             return
         }
 
+        if flight != nil {
+            if key.specialKey == .keyReturn || key.char == " " || key.specialKey == .keyEscape {
+                arrive() // SKIP TO DESTINATION
+            }
+            return
+        }
+
+        if mapActive, let map = findNode("FlatMap") as? FlatMap {
+            switch key.specialKey {
+            case .keyUp: map.scroll(dx: 0, dy: -1)
+            case .keyDown: map.scroll(dx: 0, dy: 1)
+            case .keyLeft: map.scroll(dx: -1, dy: 0)
+            case .keyRight: map.scroll(dx: 1, dy: 0)
+            case .keyEscape: closeMap()
+            default:
+                if key.char.lowercased() == "m" { closeMap() }
+            }
+            return
+        }
+
+        if key.char.lowercased() == "g" && !isOverlayActive("Fresk") && !isOverlayActive("Book") {
+            showFresk() // Paul's head: the globe and the game menu
+            return
+        }
+
         if desertActive {
             if key.specialKey == .keyEscape {
                 leaveDesert()
@@ -827,7 +1007,7 @@ final class Game: DuneNode {
             if key.specialKey == .keyEscape {
                 closeSietch()
             } else if key.char.lowercased() == "m" {
-                showFresk()
+                openMap(select: false, caption: true)
             } else if key.char.lowercased() == "b" {
                 showBook()
             } else if key.char.lowercased() == "p" {
@@ -864,11 +1044,6 @@ final class Game: DuneNode {
             return
         }
 
-        if key.char.lowercased() == "f" {
-            showSietch()
-            return
-        }
-
         if key.char.lowercased() == "p" {
             gameState.findProspectors()
             publishMainUI()
@@ -891,7 +1066,7 @@ final class Game: DuneNode {
             if character == "b" {
                 showBook()
             } else if character == "m" {
-                showFresk()
+                openMap(select: false, caption: true)
             }
         }
     }
@@ -925,6 +1100,31 @@ final class Game: DuneNode {
             } else {
                 closeDialogueLine()
             }
+            return
+        }
+
+        if flight != nil {
+            // SKIP TO DESTINATION (row 0), a tap on the view, or CHANGE
+            // DESTINATION (row 1) back to the map.
+            if menuRect.contains(event.point) && Int((event.point.y - menuRect.y) / 8) == 1 {
+                flight = nil
+                setNodeActive("DesertWalk", false)
+                setNodeActive("Flight", false)
+                openMap(select: true, caption: false)
+            } else {
+                arrive()
+            }
+            return
+        }
+
+        if mapActive {
+            handleMapClick(event.point)
+            return
+        }
+
+        if !isOverlayActive("Fresk") && !isOverlayActive("Book") && event.point.x >= 138 && event.point.x < 182
+            && event.point.y >= 134 && event.point.y < 160 && dialogueCharacter == nil {
+            showFresk() // Paul's head: the globe and the game menu
             return
         }
 
@@ -1067,7 +1267,7 @@ final class Game: DuneNode {
         case 2 where currentGameRoom == 8:
             publishMainUI()
         case 141:
-            showFresk()
+            openMap(select: false, caption: true)
         case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 132:
             // The real room-person table places Leto in 0x200A, appearance
             // 0x0180. In PALACE.SAL room 0 that is marker 0, not intro
@@ -1139,7 +1339,7 @@ final class Game: DuneNode {
             guard index < rootItems.count else { return }
             switch rootItems[index] {
             case 141:
-                showFresk()
+                openMap(select: false, caption: true)
             case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 132:
                 guard let speaker = character(forCommandItem: rootItems[index]) else { return }
                 beginDialogue(with: speaker, context: .sietch)
@@ -1256,10 +1456,8 @@ final class Game: DuneNode {
             publishMainUI()
             roomEntryScan()
         case .leave:
-            // 252-254 leave the place. The original opens the flat map to
-            // choose a destination; until the map is ported this keeps the
-            // existing desert flight (to Carthag-Tuek, location 12).
-            showDesert(destinationCode: 12)
+            // 252-254 leave the place: the flat map to choose a destination.
+            openMap(select: true, caption: false)
         case .none, .locked, .unknown:
             break
         }

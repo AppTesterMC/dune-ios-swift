@@ -133,6 +133,14 @@ struct Location {
     var water: UInt8 = 0
 
     var isSietch: Bool { type <= Location.sietchMax }
+    var hidden: Bool { status & 0x80 != 0 }
+    /// Map icon kind: 0 sietch, 1 Atreides palace, 2 village, 3 fortress,
+    /// 4 Harkonnen palace (_sub_15E4F_calc_SAL_index).
+    var kind: Int {
+        type < 0x20 ? 0 : type < 0x21 ? 1 : type < 0x28 ? 2 : type < 0x30 ? 3 : 4
+    }
+    /// Friendly for travel: below fortress types, or held by the Atreides.
+    var friendly: Bool { type < Location.fortressMin || status & 0x08 != 0 }
 }
 
 
@@ -625,6 +633,25 @@ final class World {
         vars[o + 2] = UInt8(word1 & 0xFF); vars[o + 3] = UInt8(word1 >> 8)
     }
 
+    /// Byte 21: the ornithopters parked at a place.
+    func adjustOrnithopters(_ index: Int, _ delta: Int) {
+        let o = Location.tableOffset + index * Location.recordSize + 21
+        guard o < World.size else { return }
+        vars[o] = UInt8(min(255, max(0, Int(vars[o]) + delta)))
+    }
+
+    /// Discovering a place: not hidden, byte 11 = 0, and one more known
+    /// sietch (ds:27) the first time.
+    func discover(_ index: Int) {
+        let o = Location.tableOffset + index * Location.recordSize
+        guard index < locationCount else { return }
+        if vars[o + 10] & 0x80 != 0 && vars[o + 8] <= Location.sietchMax {
+            setB(0x27, b(0x27) &+ 1)
+        }
+        vars[o + 10] &= 0x7F
+        vars[o + 11] = 0
+    }
+
     /// Clears the location's "hidden" bit so it shows on the map.
     func reveal(_ places: [Int]) {
         for p in places where p < locationCount {
@@ -729,6 +756,31 @@ final class World {
         }
         logger.log(.info, "World: phase \(String(phase, radix: 16)) callback")
         return (cutscene, vision)
+    }
+
+
+    // MARK: The live map
+
+    /// MAP.HSQ with the stage bits the game changes (ecology, saves) and
+    /// bit 6 set on every place's cell.
+    private(set) lazy var map: [UInt8] = {
+        var cells = Resource("MAP.HSQ").unpackedData
+        if cells.count < MapRenderer.mapSize {
+            cells += [UInt8](repeating: 0, count: MapRenderer.mapSize - cells.count)
+        }
+        return cells
+    }()
+
+    private(set) lazy var mapRenderer: MapRenderer = {
+        MapRenderer(map: { [unowned self] in self.map }, tablat: Resource("TABLAT.BIN", uncompressed: true).unpackedData)
+    }()
+
+    /// Distance in map cells, as travel counts it:
+    /// max(|dlng| * cells(lat0) / 65536, |dlat|).
+    func cellDistance(fromLatitude lat0: Int, longitude lng0: UInt16, toLatitude lat1: Int, longitude lng1: UInt16) -> Int {
+        let cells = mapRenderer.rowLength(lat0 + 98)
+        let dlng = abs(Int(Int16(bitPattern: lng1 &- lng0)))
+        return max(dlng * cells / 65536, abs(lat1 - lat0))
     }
 
 

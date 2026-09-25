@@ -91,7 +91,7 @@ final class GameViewController: UIViewController {
             ("MAP", DuneKeyEvent(char: "m")),
             ("ORDR", DuneKeyEvent(char: "o")),
             ("RSLT", DuneKeyEvent(char: "r")),
-            ("SIET", DuneKeyEvent(char: "f")),
+            ("GLOB", DuneKeyEvent(char: "g")),
             ("PROS", DuneKeyEvent(char: "p")),
         ])
         configureColumn(rightColumn, keys: [

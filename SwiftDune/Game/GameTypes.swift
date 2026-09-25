@@ -355,6 +355,13 @@ final class GameState {
         tickAccumulator = 0.0
     }
 
+    /// Travel: one period per 16 cells flown (seg000 flight loop).
+    func passPeriods(_ periods: Int) {
+        guard periods > 0 else { return }
+        advance(OriginalGameData.secondsPerGameTick * Double(periods))
+    }
+
+
     func advance(_ elapsed: TimeInterval) {
         guard elapsed > 0 else { return }
         elapsedTime += elapsed

@@ -36,6 +36,11 @@ final class Palace: DuneNode {
     private var gameRoomID: Int?
     private var salRoomIndex: Int?
     private var markers: Dictionary<Int, RoomCharacter> = [:]
+    /// The place's room file: PALACE.SAL, VILG.SAL or HARK.SAL (sietches
+    /// use the Sietch node). This node draws any place's rooms.
+    private var salFile = "PALACE.SAL"
+    /// Set by the game from World.isOutdoors; nil = the palace's own rule.
+    private var outdoor: Bool?
     /// Sheet from the room code (World.sheet(for:)); nil = legacy ranges.
     private var sheet: String?
     /// Character numbers in the room; placed with World.markerAssignment.
@@ -53,7 +58,7 @@ final class Palace: DuneNode {
     
     
     override func onEnable() {
-        palaceScenery = Scenery("PALACE.SAL")
+        palaceScenery = Scenery(salFile)
         sky = Sky()
         
         engine.palette.clear()
@@ -84,6 +89,8 @@ final class Palace: DuneNode {
         characterSprite = nil
         
         markers = [:]
+        salFile = "PALACE.SAL"
+        outdoor = nil
         sheet = nil
         people = nil
         character = .none
@@ -116,6 +123,17 @@ final class Palace: DuneNode {
         if let markers = params["markers"] {
             self.markers = markers as! Dictionary<Int, RoomCharacter>
             palaceScenery?.characters = self.markers
+        }
+
+        if let file = params["salFile"] as? String, file != salFile {
+            salFile = file
+            if palaceScenery != nil {
+                palaceScenery = Scenery(file)
+            }
+            contextBuffer.tag = 0
+        }
+        if params.keys.contains("outdoor") {
+            outdoor = params["outdoor"] as? Bool
         }
 
         if params.keys.contains("sheet") {
@@ -197,19 +215,25 @@ final class Palace: DuneNode {
         }
 
         let roomIndex = salRoomIndex ?? currentRoom.rawValue
-        let isGameplayExterior = gameRoomID == 1 || gameRoomID == 5
+        let isGameplayExterior = outdoor ?? (gameRoomID == 1 || gameRoomID == 5)
+        let inPalace = salFile == "PALACE.SAL"
 
         // Apply sky gradient with blue palette
         if isGameplayExterior || (gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony)) {
             // Cache per room and sky: re-draw when the period's sky changes.
-            let tag = 0x0100 | UInt32(roomIndex) << 4 | sky.lightMode.asInt
+            let tag = 0x0100 | UInt32(roomIndex) << 4 | sky.lightMode.asInt | (inPalace ? 0 : 0x1000)
             if contextBuffer.tag != tag {
                 contextBuffer.clearBuffer()
-                if gameRoomID != nil && roomIndex == 11 {
+                if gameRoomID != nil && inPalace && roomIndex == 11 {
                     // The palace front (SAL room 11) uses the large sky, 200 px.
                     sky.render(contextBuffer, width: 200, at: 0, type: .large, gameplayPalette: true)
                 } else {
                     sky.render(contextBuffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
+                }
+                if !inPalace {
+                    // Outside the palace the ground under the horizon is
+                    // colour 190 (ScummVM composeView).
+                    Primitives.fillRect(DuneRect(0, 78, 320, 74), 190, contextBuffer, isOffset: false)
                 }
                 palaceScenery.drawRoom(roomIndex, buffer: contextBuffer)
                 contextBuffer.tag = tag

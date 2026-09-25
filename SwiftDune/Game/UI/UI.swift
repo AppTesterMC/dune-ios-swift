@@ -27,6 +27,8 @@ enum UILeftPanel: Int {
     case bookClosed = 1
     case bookOpen
     case globe
+    /// The flat map: the eye frame with the planet (ICONES 6, 0x0D).
+    case map
 }
 
 enum UIRightPanel: Int {
@@ -128,6 +130,9 @@ final class UI: DuneNode {
             uiSprite.drawFrame(52, x: 20, y: 168, buffer: buffer)
             uiSprite.drawFrame(53, x: 36, y: 172, buffer: buffer)
             break
+          case .map:
+            uiSprite.drawFrame(6, x: 0, y: 152, buffer: buffer)
+            uiSprite.drawFrame(0x0D, x: 22, y: 161, buffer: buffer)
         }
       
         // Companion buttons belong to the normal room HUD only.  The DOS
@@ -145,7 +150,13 @@ final class UI: DuneNode {
         // Right part
         switch rightPanel {
           case .mapDirections:
+            // The flat map's arrows (seg000:d792 frieze; ScummVM drawPanelExtras).
             uiSprite.drawFrame(41, x: 266, y: 171, buffer: buffer)
+            uiSprite.drawFrame(37, x: 267, y: 162, buffer: buffer)
+            uiSprite.drawFrame(38, x: 285, y: 171, buffer: buffer)
+            uiSprite.drawFrame(39, x: 267, y: 184, buffer: buffer)
+            uiSprite.drawFrame(40, x: 254, y: 171, buffer: buffer)
+            uiSprite.drawFrame(53, x: 266, y: 171, buffer: buffer)
           case .roomDirections:
             uiSprite.drawFrame(33, x: 255, y: 162, buffer: buffer)
             uiSprite.drawFrame(36, x: 269, y: 173, buffer: buffer)

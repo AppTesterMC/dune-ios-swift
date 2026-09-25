@@ -290,8 +290,10 @@ final class Scenery {
     // Some room sheets (notably BALCON.HSQ) intentionally omit the shared
     // command-panel palette. POR.HSQ carries that common block.
     func setSharedPalette() {
-        spriteIndices.first?.sprite.setPalette()
+        Scenery.panelSheet.setPalette()
     }
+    /// POR.HSQ carries the panel's palette block, for every place.
+    private static let panelSheet = Sprite("POR.HSQ")
     
     
     func drawRoom(_ index: Int, buffer: PixelBuffer) {

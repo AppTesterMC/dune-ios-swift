@@ -31,6 +31,14 @@ final class GameText {
         String(bytes: commands.rawBytes(at: UInt16(index)).filter { $0 >= 0x20 && $0 < 0x80 }, encoding: .isoLatin1) ?? ""
     }
 
+    private lazy var commandTexts: [String] = (0..<Int(commands.sentenceCount())).map { command($0) }
+
+    /// The COMMAND index whose text starts with `text` (the numbering
+    /// differs between releases, so rows are looked up by text).
+    func findCommand(_ text: String) -> Int? {
+        commandTexts.firstIndex { $0.hasPrefix(text) }
+    }
+
     /// A phrase by 0-based index in PHRASEx1/PHRASEx2, codes expanded.
     func phrase(_ index: Int, secondFile: Bool = false) -> String {
         var out = ""

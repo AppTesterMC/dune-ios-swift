@@ -44,7 +44,7 @@ cable install path.
 | finger held/dragged on the picture | mouse hover (menu highlight follows the finger) |
 | swipe across the picture (≥ 20 % of its height) | arrow key in the swipe direction |
 | ESC, ⏎, SPC buttons | Escape / Return / space (skip intro, close overlays) |
-| BOOK, MAP, ORDR, RSLT, SIET, PROS | `b`, `m`, `o`, `r`, `f`, `p` (see `Game.onKey`) |
+| BOOK, MAP, GLOB, ORDR, RSLT, PROS | `b` book, `m` flat map, `g` globe and game menu (same as tapping Paul's head), `o`, `r`, `p` (see `Game.onKey`) |
 | ▲ ◀ ▶ ▼ buttons | arrow keys (rooms, desert walk, globe) |
 | hardware keyboard | same keys as on the Mac |
 
