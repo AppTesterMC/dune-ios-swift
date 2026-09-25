@@ -188,36 +188,50 @@ final class Game: DuneNode {
         showCurrentPlace()
     }
 
-    private enum MapRow { case exit, fly, takeOrnithopter }
+    private enum MapRow { case exit, fly, orders, contact, density, takeOrnithopter, prospectors }
 
-    /// map_setup_main_menu rows that are ported: EXIT MAPS, GO THERE FLYING
-    /// AN ORNI once a place is chosen, TAKE AN ORNITHOPTER (greyed rows
-    /// are left out until rows can be greyed).
-    private func mapRows() -> [(MapRow, UInt16)] {
-        var rows: [(MapRow, UInt16)] = []
+    /// map_setup_main_menu (seg000:878c): EXIT MAPS; GO THERE FLYING AN
+    /// ORNI once a place is chosen; GIVE ORDERS TO TROOP within a contact
+    /// range under 2 (greyed without a hired troop here), else CONTACT
+    /// FREMEN TROOPS (greyed without rallied troops); SEE SPICE DENSITY
+    /// (greyed before phase 5); TAKE AN ORNITHOPTER (greyed without one
+    /// parked here); FIND PROSPECTORS from phase 5.
+    private func mapRows() -> [(row: MapRow, id: UInt16, greyed: Bool)] {
+        var rows: [(row: MapRow, id: UInt16, greyed: Bool)] = []
         let text = GameText.shared
-        if let exit = text.findCommand("EXIT MAPS") { rows.append((.exit, UInt16(exit))) }
-        let map = flatMap
-        if map.selecting {
-            if let destination = map.destination, destination != world.currentLocation,
-               let fly = text.findCommand("GO THERE FLYING AN ORNI") {
-                rows.append((.fly, UInt16(fly)))
-            }
-        } else if world.location(world.currentLocation).ornithopters > 0 || world.placeType == Location.palace,
-                  let take = text.findCommand("TAKE AN ORNITHOPTER") {
-            rows.append((.takeOrnithopter, UInt16(take)))
+        func add(_ row: MapRow, _ caption: String, _ greyed: Bool = false) {
+            if let id = text.findCommand(caption) { rows.append((row, UInt16(id), greyed)) }
         }
-        return rows
+        let map = flatMap
+        let phase = world.b(World.phase)
+        add(.exit, "EXIT MAPS")
+        if map.selecting, let destination = map.destination, destination != world.currentLocation {
+            add(.fly, "GO THERE FLYING AN ORNI")
+        }
+        if world.w(0x1176) < 2 {
+            add(.orders, "GIVE ORDERS TO TROOP", world.localTroop(hired: true) == nil)
+        } else {
+            add(.contact, "CONTACT FREMEN TROOPS", world.b(World.fremenTroops) == 0)
+        }
+        add(.density, map.density ? "STANDARD VISION" : "SEE SPICE DENSITY", phase < 5)
+        if !map.selecting {
+            let parked = world.location(world.currentLocation).ornithopters > 0 || world.placeType == Location.palace
+            add(.takeOrnithopter, "TAKE AN ORNITHOPTER", !parked)
+        }
+        if phase >= 5 { add(.prospectors, "FIND PROSPECTORS") }
+        return Array(rows.prefix(5))
     }
 
     private func publishMapUI() {
+        let rows = mapRows()
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .map,
             rightPanel: .mapDirections,
-            items: mapRows().map { $0.1 },
+            items: rows.map { $0.id },
             directions: [],
             day: gameState.day,
-            phase: gameState.phase
+            phase: gameState.phase,
+            greyed: rows.map { $0.greyed }
         ))
     }
 
@@ -238,8 +252,8 @@ final class Game: DuneNode {
         guard menuRect.contains(point) else { return }
         let rows = mapRows()
         let index = Int((point.y - menuRect.y) / 8)
-        guard index >= 0 && index < rows.count else { return }
-        switch rows[index].0 {
+        guard index >= 0 && index < rows.count, !rows[index].greyed else { return }
+        switch rows[index].row {
         case .exit:
             closeMap()
         case .takeOrnithopter:
@@ -249,6 +263,18 @@ final class Game: DuneNode {
             if let destination = map.destination {
                 fly(to: destination)
             }
+        case .density:
+            map.density.toggle()
+            publishMapUI()
+        case .prospectors:
+            // Centre on the prospectors (troop 3); their contact popup is
+            // not ported yet.
+            if let place = world.troopPlace(3) {
+                map.choose(place)
+                publishMapUI()
+            }
+        case .orders, .contact:
+            break // the troop contact popup is not ported yet
         }
     }
 
@@ -465,14 +491,15 @@ final class Game: DuneNode {
     }
 
 
-    private func publishDialogueUI() {
+    private func publishDialogueUI(greyed: [Bool]? = nil) {
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .bookClosed,
             rightPanel: .roomDirections,
             items: dialogueMenuItems,
             directions: sietchActive ? [] : roomDirections(),
             day: gameState.day,
-            phase: gameState.phase
+            phase: gameState.phase,
+            greyed: greyed
         ))
     }
 
@@ -628,14 +655,15 @@ final class Game: DuneNode {
         let kynesMet = world.b(0x0A) & 0x20 != 0
         let text = GameText.shared
         var rows: [(UInt8?, String)] = []
+        // ECOLOGY is greyed until Kynes is met (ds:0A bit 5, seg000:69b3).
+        let ecology: UInt8? = kynesMet ? TroopJob.irrigation : 0xFE
         if job == TroopJob.waitingForOrders {
-            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (TroopJob.militaryTraining, "SPECIALIZE IN ARMY")]
-            if kynesMet { rows.append((TroopJob.irrigation, "SPECIALIZE IN ECOLOGY")) }
+            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (TroopJob.militaryTraining, "SPECIALIZE IN ARMY"),
+                    (ecology, "SPECIALIZE IN ECOLOGY")]
         } else if job & 0x0C == 0 {
             rows = [(TroopJob.spiceMining, "Spice Mining"), (TroopJob.prospecting, "Spice Prospection")]
         } else if job & 0x0C == 4 {
-            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE")]
-            if kynesMet { rows.append((TroopJob.irrigation, "SPECIALIZE IN ECOLOGY")) }
+            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (ecology, "SPECIALIZE IN ECOLOGY")]
         } else {
             rows = [((job & 0x0C) | 1, "ASSEMBLY WIND-TRAP"), (TroopJob.spiceMining, "SPECIALIZE IN SPICE"),
                     (TroopJob.militaryTraining, "SPECIALIZE IN ARMY")]
@@ -643,12 +671,13 @@ final class Game: DuneNode {
         rows.append((0xFF, "Cancel"))
         troopRows = rows.compactMap { row in text.findCommand(row.1).map { (row.0, UInt16($0)) } }
         dialogueMenuItems = troopRows.map { $0.id }
-        publishDialogueUI()
+        publishDialogueUI(greyed: troopRows.map { $0.job == 0xFE })
     }
 
     private func handleTroopMenu(_ index: Int) {
         guard index >= 0 && index < troopRows.count, let troop = world.localTroop(hired: true) else { return }
         let row = troopRows[index]
+        if row.job == 0xFE { return } // greyed
         switch (troopMenu, row.job) {
         case (.orders, nil):
             openOccupationMenu(troop)

@@ -25,6 +25,8 @@ final class FlatMap: DuneNode {
     private(set) var selecting = false
     /// The place tapped, its popup shown.
     private(set) var destination: Int?
+    /// SEE SPICE DENSITY: rings around the known sietches.
+    var density = false
     /// The DUNE MAP box shown when the map opens from a room (4,993 ms).
     private var captionUntil: TimeInterval = 0
     /// 320 x 152 place index per pixel, 0xFF = none.
@@ -52,6 +54,7 @@ final class FlatMap: DuneNode {
         if let selecting = params["select"] as? Bool {
             self.selecting = selecting
             destination = nil
+            density = false
             captionUntil = (params["caption"] as? Bool ?? false) ? currentTime + 4.993 : 0
             centreOn(world.currentLocation)
         }
@@ -131,6 +134,12 @@ final class FlatMap: DuneNode {
             guard !l.hidden,
                   let p = world.mapRenderer.project(latitude: latitude, longitude: longitude,
                                                      placeLatitude: Int(l.latitude), placeLongitude: l.longitude) else { continue }
+            if density && l.isSietch && l.spiceDensity > 0 {
+                // ONMAP 133-140: eight rings, one per 32 of density (the
+                // original's scale is not decoded).
+                let ring = UInt16(133 + min(7, Int(l.spiceDensity) / 32))
+                icons.drawFrame(ring, x: p.x - 9, y: p.y - 9, buffer: buffer)
+            }
             // ONMAP 122-126: sietch, Atreides palace, village, fortress,
             // Harkonnen palace.
             let frame = UInt16(122 + l.kind)

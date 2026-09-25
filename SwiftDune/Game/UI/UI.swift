@@ -50,6 +50,7 @@ final class UI: DuneNode {
     private var directions: UIDirection = .all
     private var menuItems: [UInt16] = []
     private var menuCaptions: [String]? = nil
+    private var menuGreyed: [Bool]? = nil
     private var dayNumber = 1
     private var phase: GamePhase = .dawn
     
@@ -243,7 +244,8 @@ final class UI: DuneNode {
 
             uiSprite.drawFrame(27, x: 92, y: y, buffer: buffer)
 
-            if i == selectedMenuIndex {
+            let greyed = menuGreyed?.indices.contains(i) == true && menuGreyed![i]
+            if i == selectedMenuIndex && !greyed && i < menuItems.count {
                 Primitives.fillRect(menuItemBackgroundRect, 250, buffer, isOffset: false)
             }
 
@@ -251,7 +253,7 @@ final class UI: DuneNode {
                 let sentence = menuCaptions?.indices.contains(i) == true
                     ? menuCaptions![i]
                     : commands.sentence(at: menuItems[i])
-                font.paletteIndex = i == selectedMenuIndex ? darkColorIndex : lightColorIndex
+                font.paletteIndex = greyed ? 246 : i == selectedMenuIndex ? darkColorIndex : lightColorIndex
                 let row = font.fit(sentence, width: Int(menuItemTextRect.width) - 2, style: .small)
                 font.render(row, rect: menuItemTextRect, buffer: buffer, style: .small)
             }
@@ -264,6 +266,7 @@ final class UI: DuneNode {
     func onUIEvent(_ e: UIStateEventData) {
         self.menuItems = e.items
         self.menuCaptions = e.captions
+        self.menuGreyed = e.greyed
         self.leftPanel = e.leftPanel
         self.rightPanel = e.rightPanel
         self.directions = e.directions
@@ -281,6 +284,9 @@ struct UIStateEventData {
     var day: Int = 1
     var phase: GamePhase = .dawn
     var captions: [String]? = nil
+    /// Greyed rows: drawn in colour 246 (dark + 3), not selectable, no
+    /// highlight (Panel::setRowDisabled in the ScummVM engine).
+    var greyed: [Bool]? = nil
 }
 
 
