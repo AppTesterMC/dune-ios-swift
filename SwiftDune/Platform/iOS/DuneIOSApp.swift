@@ -137,6 +137,8 @@ final class GameViewController: UIViewController {
 
         leftColumn.frame = CGRect(x: safe.minX, y: safe.minY, width: columnWidth, height: safe.height)
         rightColumn.frame = CGRect(x: safe.maxX - columnWidth, y: safe.minY, width: columnWidth, height: safe.height)
+
+        engine.logger.log(.info, "layout view=\(view.bounds) safe=\(safe) game=\(gameView.frame) drawable=\(gameView.drawableSize)")
     }
 
 

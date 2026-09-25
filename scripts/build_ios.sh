@@ -2,6 +2,7 @@
 # Build the iOS app and package a TrollStore-installable IPA.
 #
 #   scripts/build_ios.sh            # device IPA -> builds/SwiftDune-ios-<stamp>.ipa
+#   scripts/build_ios.sh sim        # simulator .app, printed as APP=...
 #
 # Builds from this local checkout (~/dune-ios-swift), never from /Volumes:
 # the SMB volume disconnects and /private/tmp is wiped on reset. Derived data
@@ -14,9 +15,18 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 stamp="$(date +%Y%m%d-%H%M%S)"
 derived="$repo_root/build/derived"
+mode="${1:-device}"
 
 cd "$repo_root"
 xcodegen generate --spec project-ios.yml --quiet
+
+if [[ "$mode" == sim ]]; then
+  xcodebuild -project SwiftDuneiOS.xcodeproj -target DuneiOS -configuration Debug \
+    -sdk iphonesimulator ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+    SYMROOT="$derived/Build/Products" OBJROOT="$derived/Build/Intermediates" build -quiet
+  print "APP=$derived/Build/Products/Debug-iphonesimulator/Dune.app"
+  exit 0
+fi
 
 # No iOS simulator runtime is installed on this Mac and the "Any iOS Device"
 # destination refuses to resolve, so build by -target/-sdk like the ScummVM

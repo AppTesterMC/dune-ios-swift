@@ -31,11 +31,13 @@ final class Main: DuneNode {
             self.onNodeEvent(nodeData)
         }
         
-        queue.enqueue(DuneNodeParams("Logo"))
-        queue.enqueue(DuneNodeParams("Intro"))
-        queue.enqueue(DuneNodeParams("Credits"))
-        queue.enqueue(DuneNodeParams("Prologue"))
-        if !skipCopyProtection {
+        if !DevHarness.shared.startInGame {
+            queue.enqueue(DuneNodeParams("Logo"))
+            queue.enqueue(DuneNodeParams("Intro"))
+            queue.enqueue(DuneNodeParams("Credits"))
+            queue.enqueue(DuneNodeParams("Prologue"))
+        }
+        if !skipCopyProtection && !DevHarness.shared.startInGame {
             queue.enqueue(DuneNodeParams("CopyProtection", [ "bypassProtection": true ]))
         }
         queue.enqueue(DuneNodeParams("Game"))

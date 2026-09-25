@@ -109,6 +109,7 @@ final class DuneEngine {
                 let elapsedTime = currentTime - lastTime
                 gameTime += elapsedTime
                 
+                DevHarness.shared.tick(gameTime, self)
                 processInput()
                 
                 update(elapsedTime)

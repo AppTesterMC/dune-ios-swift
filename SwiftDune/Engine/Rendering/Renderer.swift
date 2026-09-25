@@ -30,6 +30,7 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
     private var rawBufferPointer: UnsafeMutablePointer<UInt8>
     private var shouldTakeScreenshot = false
     private var screenshotScale = 3
+    private var screenshotName: String?
 
     var metalView: MTKView
     
@@ -203,8 +204,9 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
     }
     
     
-    func requestScreenshot(_ scale: Int = 1) {
+    func requestScreenshot(_ scale: Int = 1, name: String? = nil) {
         self.screenshotScale = scale
+        self.screenshotName = name
         self.shouldTakeScreenshot = true
     }
     
@@ -238,9 +240,16 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         
         // Create a destination URL
         let date = NSDate()
-        let fileName = "DuneCapture_\(date.timeIntervalSince1970)@\(scale)x.png"
-        let downloadsDirectory = DuneEngine.outputDirectory
-        let fileURL = downloadsDirectory.appendingPathComponent(fileName)
+        var fileURL = DuneEngine.outputDirectory
+            .appendingPathComponent("DuneCapture_\(date.timeIntervalSince1970)@\(scale)x.png")
+
+        if let name = screenshotName {
+            // Dev harness shots: stable names in a shots/ subfolder.
+            let shots = DuneEngine.outputDirectory.appendingPathComponent("shots")
+            try? FileManager.default.createDirectory(at: shots, withIntermediateDirectories: true)
+            fileURL = shots.appendingPathComponent("\(name).png")
+            screenshotName = nil
+        }
         
         // Create a CGImageDestination
         guard let destination = CGImageDestinationCreateWithURL(fileURL as NSURL, UTType.png.identifier as CFString, 1, nil) else {

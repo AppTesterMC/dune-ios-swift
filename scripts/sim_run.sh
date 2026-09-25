@@ -1,0 +1,42 @@
+#!/bin/zsh
+# Run the iOS build on the "iPhone 14 Pro (Dune)" simulator (the test phone is
+# an iPhone 14 Pro, iPhone15,2) with dev-harness variables, wait, and copy the
+# harness screenshots + log to build/shots/<run>/.
+#
+#   scripts/sim_run.sh <run-name> <seconds> [DUNE_START=game] [DUNE_SCRIPT=...]
+#
+# The simulator is created on first use and its UDID kept in build/sim-udid.
+
+set -euo pipefail
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+run="$1"; seconds="$2"; shift 2
+bundle=com.apptestermc.swiftdune
+
+cd "$repo_root"
+udid_file=build/sim-udid
+if [[ ! -s $udid_file ]] || ! xcrun simctl list devices | grep -q "$(cat $udid_file)"; then
+  mkdir -p build
+  xcrun simctl create "iPhone 14 Pro (Dune)" com.apple.CoreSimulator.SimDeviceType.iPhone-14-Pro \
+    "$(xcrun simctl list runtimes | awk '/iOS/ {print $NF}' | tail -1)" > $udid_file
+fi
+sim=$(cat $udid_file)
+xcrun simctl boot $sim 2>/dev/null || true
+
+app=$(scripts/build_ios.sh sim | sed -n 's/^APP=//p')
+xcrun simctl terminate $sim $bundle 2>/dev/null || true
+timeout 120 xcrun simctl install $sim "$app"
+
+data=$(xcrun simctl get_app_container $sim $bundle data)
+rm -rf "$data/Documents/shots" "$data/Documents/dune-ios.log"
+
+env_args=()
+for kv in "$@"; do env_args+=("SIMCTL_CHILD_$kv"); done
+env "${env_args[@]}" xcrun simctl launch $sim $bundle >/dev/null
+sleep "$seconds"
+
+out=build/shots/$run
+rm -rf "$out"; mkdir -p "$out"
+cp -R "$data/Documents/shots/." "$out/" 2>/dev/null || true
+cp "$data/Documents/dune-ios.log" "$out/" 2>/dev/null || true
+xcrun simctl io $sim screenshot "$out/device.png" >/dev/null 2>&1 || true
+print "OUT=$out"; ls "$out"
