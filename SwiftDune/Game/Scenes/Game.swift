@@ -177,16 +177,11 @@ final class Game: DuneNode {
         if firstGameplaySietch {
             gameState.advanceStory(to: 0x01, action: "FIRST SIETCH")
         }
-        if let sietch = findNode("Sietch") {
-            sietch.params = [
-                "room": SietchRoom.room8,
-                // Room 8 with Harah/Stilgar is the extracted intro landing.
-                // The first playable flight lands at location 12; the
-                // walkthrough's first visit there is Gurney's sietch.
-                "markers": firstGameplaySietch ? [:] : [6: RoomCharacter.harah, 9: RoomCharacter.stilgar],
-                "character": firstGameplaySietch ? DuneCharacter.gurney : DuneCharacter.none
-            ]
+        // Land in room 1 (the SIET0 outdoor view) of the location.
+        if world.location(gameState.currentLocation).isSietch {
+            world.setPosition(location: gameState.currentLocation, room: 1)
         }
+        publishSietchRoom()
 
         sietchActive = true
         sietchMenuMode = .root
@@ -202,13 +197,21 @@ final class Game: DuneNode {
 
 
     private func sietchRootCharacterItems() -> [UInt16] {
-        // This is the data-driven order seen in the original early sietch
-        // screens: map first, followed by the room-person records. The exact
-        // command strings come from COMMAND1.HSQ.
-        if gameState.currentLocation == 12 {
-            return [141, 124, 113, 117]
+        // SEE DUNE MAP, then the room's people: COMMAND 109 + character for
+        // the named ones, 123 "Fremen" for the troops not hired yet and 124
+        // "Fremen Chief" for each hired troop's chief.
+        guard world.placeType <= Location.sietchMax else { return [141, 123] }
+        var items: [UInt16] = [141]
+        for person in world.peopleInRoom() {
+            if person <= World.harah {
+                items.append(UInt16(109 + person))
+            } else if person == World.fremen {
+                items.append(123)
+            } else if person >= World.fremenChief {
+                items.append(124)
+            }
         }
-        return [141, 124, 113, 117]
+        return Array(items.prefix(5))
     }
 
 
@@ -223,7 +226,8 @@ final class Game: DuneNode {
         case 115: return .liet
         case 116: return .chani
         case 117: return .harah
-        case 124: return .fremen1
+        case 123: return .fremen1
+        case 124: return .fremen2
         case 132: return .fremen2
         default: return nil
         }
@@ -261,13 +265,7 @@ final class Game: DuneNode {
 
     private func showRoomOrSietch() {
         if sietchActive {
-            if let sietch = findNode("Sietch") {
-                sietch.params = [
-                    "room": SietchRoom.room8,
-                    "markers": gameState.currentLocation == 12 ? [:] : [6: RoomCharacter.harah, 9: RoomCharacter.stilgar],
-                    "character": dialogueCharacter ?? (gameState.currentLocation == 12 ? DuneCharacter.gurney : DuneCharacter.none)
-                ]
-            }
+            publishSietchRoom()
             setNodeActive("Sietch", true, .background)
         } else {
             showRoom()
@@ -475,10 +473,55 @@ final class Game: DuneNode {
     }
 
 
+    /// Shows the sietch room Paul is in (World position), with its people.
+    private func publishSietchRoom() {
+        guard let sietch = findNode("Sietch") else { return }
+        let record = world.placeType <= Location.sietchMax ? world.currentRoomRecord() : nil
+        var params: [String: Any] = [
+            "room": SietchRoom(rawValue: record?.salRoom ?? 8) ?? .room8,
+            "people": record != nil ? world.peopleInRoom() : [World.stilgar, World.harah],
+        ]
+        if let dialogueCharacter = dialogueCharacter {
+            params["character"] = dialogueCharacter
+        } else {
+            params["character"] = DuneCharacter.none
+        }
+        sietch.params = params
+    }
+
+
+    private func sietchDirections() -> UIDirection {
+        var directions: UIDirection = []
+        guard world.placeType <= Location.sietchMax, let exits = world.currentRoomRecord()?.exits else { return directions }
+        for (i, d) in [UIDirection.up, .right, .down, .left].enumerated() {
+            if case .room = RoomRecord.decode(exits[i]) { directions.insert(d) }
+            if case .leave = RoomRecord.decode(exits[i]) { directions.insert(d) }
+        }
+        return directions
+    }
+
+
+    private func moveSietchRoom(_ direction: RoomDirection) {
+        guard world.placeType <= Location.sietchMax, let exits = world.currentRoomRecord()?.exits else { return }
+        switch RoomRecord.decode(exits[direction.rawValue]) {
+        case .room(let room):
+            world.setRoom(room)
+            publishSietchRoom()
+            publishSietchUI(items: sietchRootCharacterItems())
+        case .leave:
+            closeSietch()
+        default:
+            break
+        }
+    }
+
+
     private func closeSietch() {
         sietchActive = false
         sietchMenuMode = .root
         setNodeActive("Sietch", false)
+        // No flat map yet: leaving flies Paul back to the palace front.
+        world.setPosition(location: 0, room: 1)
         showRoom()
         setNodeActive("UI", true, .foreground)
         publishMainUI()
@@ -604,6 +647,13 @@ final class Game: DuneNode {
                 return
             }
 
+            switch key.specialKey {
+            case .keyUp: moveSietchRoom(.up); return
+            case .keyRight: moveSietchRoom(.right); return
+            case .keyDown: moveSietchRoom(.down); return
+            case .keyLeft: moveSietchRoom(.left); return
+            default: break
+            }
             if key.specialKey == .keyEscape {
                 closeSietch()
             } else if key.char.lowercased() == "m" {
@@ -750,7 +800,9 @@ final class Game: DuneNode {
                 return
             }
 
-            if menuRect.contains(event.point) {
+            if let direction = panelDirection(at: event.point) {
+                moveSietchRoom(direction)
+            } else if menuRect.contains(event.point) {
                 handleSietchMenuClick(event.point)
             }
             return
@@ -804,15 +856,8 @@ final class Game: DuneNode {
         }
 
         if point.y >= 152 && point.x >= 228 {
-            // Match dune-re-ref's NAV_PANEL_ROOM hit rectangles exactly.
-            if point.x >= 269 && point.x < 279 && point.y >= 162 && point.y < 172 {
-                moveRoom(.up)
-            } else if point.x >= 284 && point.x < 294 && point.y >= 172 && point.y < 182 {
-                moveRoom(.right)
-            } else if point.x >= 269 && point.x < 279 && point.y >= 181 && point.y < 191 {
-                moveRoom(.down)
-            } else if point.x >= 255 && point.x < 265 && point.y >= 172 && point.y < 182 {
-                moveRoom(.left)
+            if let direction = panelDirection(at: point) {
+                moveRoom(direction)
             }
             return
         }
@@ -835,7 +880,7 @@ final class Game: DuneNode {
             publishMainUI()
         case 141:
             showFresk()
-        case 109, 110, 111, 112, 113, 114, 115, 116, 117, 124, 132:
+        case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 132:
             // The real room-person table places Leto in 0x200A, appearance
             // 0x0180. In PALACE.SAL room 0 that is marker 0, not intro
             // marker 8. Selecting his command returns to that room with the
@@ -889,7 +934,7 @@ final class Game: DuneNode {
             leftPanel: .bookClosed,
             rightPanel: .roomDirections,
             items: items,
-            directions: [],
+            directions: sietchDirections(),
             day: gameState.day,
             phase: gameState.phase
         ))
@@ -907,7 +952,7 @@ final class Game: DuneNode {
             switch rootItems[index] {
             case 141:
                 showFresk()
-            case 109, 110, 111, 112, 113, 114, 115, 116, 117, 124, 132:
+            case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 132:
                 guard let speaker = character(forCommandItem: rootItems[index]) else { return }
                 beginDialogue(with: speaker, context: .sietch)
             default:
@@ -999,6 +1044,16 @@ final class Game: DuneNode {
         case right = 1
         case down = 2
         case left = 3
+    }
+
+
+    /// The panel compass arrows (dune-re-ref's NAV_PANEL_ROOM rectangles).
+    private func panelDirection(at point: DunePoint) -> RoomDirection? {
+        if point.x >= 269 && point.x < 279 && point.y >= 162 && point.y < 172 { return .up }
+        if point.x >= 284 && point.x < 294 && point.y >= 172 && point.y < 182 { return .right }
+        if point.x >= 269 && point.x < 279 && point.y >= 181 && point.y < 191 { return .down }
+        if point.x >= 255 && point.x < 265 && point.y >= 172 && point.y < 182 { return .left }
+        return nil
     }
 
 
