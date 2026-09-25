@@ -178,6 +178,8 @@ final class Palace: DuneNode {
         if currentRoom == .stairs && dayMode == .sunrise {
             let sunriseProgress = Math.clampf((currentTime - 2.0) / 3.0, 0.0, 1.0)
             sky.lightMode = .custom(index: 16, prevIndex: 3, blend: sunriseProgress)
+        } else if gameRoomID != nil {
+            sky.lightMode = GameState.shared.phase.lightMode
         } else {
             sky.lightMode = .day
         }
@@ -195,10 +197,18 @@ final class Palace: DuneNode {
 
         // Apply sky gradient with blue palette
         if isGameplayExterior || (gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony)) {
-            if contextBuffer.tag != 0x0001 {
-                sky.render(contextBuffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
+            // Cache per room and sky: re-draw when the period's sky changes.
+            let tag = 0x0100 | UInt32(roomIndex) << 4 | sky.lightMode.asInt
+            if contextBuffer.tag != tag {
+                contextBuffer.clearBuffer()
+                if gameRoomID != nil && roomIndex == 11 {
+                    // The palace front (SAL room 11) uses the large sky, 200 px.
+                    sky.render(contextBuffer, width: 200, at: 0, type: .large, gameplayPalette: true)
+                } else {
+                    sky.render(contextBuffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
+                }
                 palaceScenery.drawRoom(roomIndex, buffer: contextBuffer)
-                contextBuffer.tag = 0x0001
+                contextBuffer.tag = tag
             }
 
             contextBuffer.render(to: intermediateFrameBuffer, effect: fx)
@@ -242,6 +252,10 @@ final class Palace: DuneNode {
         // balcony seen after room changes.
         if gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony || currentRoom == .stairs) {
             sky.setPalette()
+        } else if isGameplayExterior {
+            // Outdoor sheets have no palette of their own for 128-222: they
+            // use the sky's, for the current period (FINDINGS, room drawing).
+            sky.setPalette(gameplayPalette: true)
         }
         
         if let characterSprite = characterSprite {

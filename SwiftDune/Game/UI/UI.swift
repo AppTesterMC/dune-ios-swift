@@ -170,6 +170,16 @@ final class UI: DuneNode {
     }
   
   
+    private static let sunPositions: [(x: Int16, y: Int16)?] = [
+        (6, 187), (6, 186), (6, 185), (7, 183), (9, 182), (10, 181), (13, 181), (16, 181),
+        (18, 182), (20, 183), (20, 185), (20, 186), (20, 187), nil, nil, nil
+    ]
+    private static let moonPositions: [(x: Int16, y: Int16)?] = [
+        (25, 186), (26, 188), nil, nil, nil, nil, nil, nil,
+        nil, nil, nil, (8, 188), (9, 186), (12, 183), (17, 182), (23, 183)
+    ]
+
+
     private func renderTimeAndDay(_ buffer: PixelBuffer) {
         guard let uiSprite = uiSprite,
               let font = font else {
@@ -179,8 +189,15 @@ final class UI: DuneNode {
         font.paletteIndex = lightColorIndex
         font.render(String(dayNumber), rect: dayTextRect, buffer: buffer, alignment: .center, style: .small)
       
-        let phaseFrame: UInt16 = phase == .night ? 75 : 74
-        uiSprite.drawFrame(phaseFrame, x: 6, y: 184, buffer: buffer)
+        // Sun (ICONES 0x4A) and moon (0x4B) positions for each of the 16
+        // periods of a day: the table at ds:1E7E (ScummVM panel.cpp).
+        let period = World.shared.hour
+        if let sun = UI.sunPositions[period] {
+            uiSprite.drawFrame(0x4A, x: sun.x, y: sun.y, buffer: buffer)
+        }
+        if let moon = UI.moonPositions[period] {
+            uiSprite.drawFrame(0x4B, x: moon.x, y: moon.y, buffer: buffer)
+        }
     }
     
     

@@ -58,6 +58,9 @@ final class Game: DuneNode {
     override func onEnable() {
       engine.palette.clear()
       world.reset() // new game: the executable's data, Paul in the throne room
+      if let time = DevHarness.shared.startTime {
+          world.setW(World.gameTime, time)
+      }
       dialogueCharacter = nil
       lastDialogueCharacter = nil
       dialogueMenuItems = []
@@ -529,7 +532,13 @@ final class Game: DuneNode {
 
 
     override func update(_ elapsedTime: TimeInterval) {
-        gameState.advance(elapsedTime)
+        // The clock runs only in room and map views; a dialogue, the book or a
+        // menu holds it (game_suspend_count, seg000:ef6a).
+        let held = dialogueCharacter != nil || isOverlayActive("Dialogue") || isOverlayActive("Book")
+            || isOverlayActive("Fresk") || isOverlayActive("Communication")
+        if !held {
+            gameState.advance(elapsedTime)
+        }
         super.update(elapsedTime)
     }
 

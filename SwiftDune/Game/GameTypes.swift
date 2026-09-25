@@ -157,6 +157,19 @@ enum GamePhase: UInt8, CaseIterable {
         }
     }
 
+    /// The sky of one of the 16 periods of a day. The panel's sun is up in
+    /// periods 0-12 and the moon in 11-1 (table at ds:1E7E); the sky
+    /// follows: sunrise, day, sunset, night (ScummVM skyPalette; the real
+    /// mapping, sub_138B4, is not decoded).
+    init(period: Int) {
+        switch period & 15 {
+        case 0: self = .dawn
+        case 1...10: self = .day
+        case 11...12: self = .dusk
+        default: self = .night
+        }
+    }
+
     var lightMode: DuneLightMode {
         switch self {
         case .dawn: return .sunrise
@@ -311,6 +324,7 @@ final class GameState {
         gameHour = Int(gameTicks & 0x000F)
         sunlightDay = Int((UInt32(gameTicks) + UInt32(OriginalGameData.sunlightDayOffset)) >> 4)
         day = World.shared.day
+        phase = GamePhase(period: gameHour)
         phase = .dawn
         troopOrder = .hold
         troopOccupation = .none
@@ -357,10 +371,7 @@ final class GameState {
         day = World.shared.day
         sunlightDay = Int((UInt32(gameTicks) + UInt32(OriginalGameData.sunlightDayOffset)) >> 4)
 
-        // The executable exposes a 0...15 game hour.  The Swift UI keeps a
-        // four-part light presentation, so each displayed phase covers four
-        // original hours without changing the raw clock semantics.
-        phase = GamePhase.allCases[gameHour / 4]
+        phase = GamePhase(period: gameHour)
 
         if day != oldDay {
             if shipmentPending && shipmentDaysRemaining > 0 {

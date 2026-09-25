@@ -8,6 +8,7 @@
 //
 //  Environment variables (on the simulator pass them as SIMCTL_CHILD_<name>):
 //    DUNE_START=game          skip logo/intro/credits/prologue
+//    DUNE_TIME=<n>            start the game clock (ds:2) at n (16 per day)
 //    DUNE_SCRIPT=<steps>      ';'-separated "<seconds>:<action>[:<arg>]"
 //        key:<esc|ret|del|left|right|up|down|c>   press a key (c = one char)
 //        click:<x>,<y>                           click at a game pixel
@@ -24,6 +25,7 @@ final class DevHarness {
     static let shared = DevHarness()
 
     let startInGame: Bool
+    let startTime: UInt16?
 
     private struct Step {
         let time: TimeInterval
@@ -36,6 +38,7 @@ final class DevHarness {
     private init() {
         let environment = ProcessInfo.processInfo.environment
         startInGame = environment["DUNE_START"]?.lowercased() == "game"
+        startTime = environment["DUNE_TIME"].flatMap { UInt16($0) }
 
         steps = (environment["DUNE_SCRIPT"] ?? "")
             .split(separator: ";")

@@ -332,6 +332,9 @@ final class Scenery {
         
         let frameInfo = characterSprite.frame(at: Int(character.rawValue))
         let scale = CGFloat((frameInfo.width << 8) / marker.scale) / CGFloat(frameInfo.width)
+        if ProcessInfo.processInfo.environment["DUNE_LOG_MARKERS"] != nil {
+            engine.logger.log(.debug, "marker \(marker.index) at \(marker.pt.x),\(marker.pt.y) scale \(marker.scale) -> PERS \(character.rawValue) \(frameInfo.width)x\(frameInfo.height)")
+        }
         
         var fx: SpriteEffect {
             return .transform(offset: marker.paletteOffset, flipX: marker.flipX, flipY: marker.flipY, scale: scale)
