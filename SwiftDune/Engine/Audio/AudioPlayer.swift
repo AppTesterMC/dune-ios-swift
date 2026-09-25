@@ -52,7 +52,7 @@ final class AudioPlayer {
     init() {
         #if os(iOS)
         // Without the playback category the ring/silent switch mutes the game
-        // (same issue the ScummVM port hit; see docs/IOS_PORT.md).
+        // (same issue the ScummVM port hit; see IOS_PORT.md).
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
         try? AVAudioSession.sharedInstance().setActive(true)
         #endif

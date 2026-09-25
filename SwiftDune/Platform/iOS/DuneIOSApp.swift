@@ -6,7 +6,7 @@
 //  target; this file replaces DuneGameApp.swift (AppKit window + NSEvent
 //  monitors) with a UIKit scene, touch input and on-screen keys.
 //
-//  Input mapping (see docs/IOS_PORT.md):
+//  Input mapping (see IOS_PORT.md):
 //  - tap on the picture        -> mouse click at that game pixel
 //  - drag on the picture       -> mouse hover (menu highlight)
 //  - swipe on the picture      -> arrow key (room / desert / globe moves)
