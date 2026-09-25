@@ -400,7 +400,7 @@ final class Game: DuneNode {
             } else if person == World.fremen {
                 items.append(123)
             } else if person >= World.fremenChief {
-                items.append(124)
+                items.append(UInt16(124 + person - World.fremenChief)) // Fremen Chief, 2nd ..., 8th
             }
         }
         return Array(items.prefix(5))
@@ -419,7 +419,7 @@ final class Game: DuneNode {
         case 116: return .chani
         case 117: return .harah
         case 123: return .fremen1
-        case 124: return .fremen2
+        case 124...131: return .fremen2
         case 132: return .fremen2
         default: return nil
         }
@@ -522,7 +522,8 @@ final class Game: DuneNode {
         case .chani: return World.chani
         case .harah: return World.harah
         case .smuggler: return World.smuggler
-        case .fremen1, .fremen2, .fremen3: return World.fremen
+        case .fremen1, .fremen3: return World.fremen
+        case .fremen2: return World.fremenChief
         default: return nil
         }
     }
@@ -531,6 +532,10 @@ final class Game: DuneNode {
     /// The talk rows (seg000:95xx): TALK TO ME; COME WITH ME, or STAY HERE
     /// for a companion; STOP TALKING.
     private func talkRows(_ character: DuneCharacter) -> [UInt16] {
+        // A troop not hired yet: WORK FOR ME (139); a chief: GIVE ORDERS
+        // TO TROOP (136).
+        if characterNumber(character) == World.fremen { return [133, 139, 137] }
+        if characterNumber(character) == World.fremenChief { return [133, 136, 137] }
         guard let number = characterNumber(character), number < World.fremen else { return [133, 137] }
         let with = world.w(World.personsWith) & (UInt16(1) << UInt16(number)) != 0
         return [133, with ? 135 : 134, 137]
@@ -566,6 +571,98 @@ final class Game: DuneNode {
         }
         dialogueMenuItems = talkRows(character)
         publishDialogueUI()
+    }
+
+
+    // MARK: - Troops
+
+    private enum TroopMenu { case orders, occupation }
+    private var troopMenu: TroopMenu = .orders
+    private var troopRows: [(job: UInt8?, id: UInt16)] = []
+
+    /// WORK FOR ME (seg000:95c1): the charisma check, the Fremen's list-5
+    /// answer; a pass rallies the troop and the talk goes on with its chief.
+    private func workForMe() {
+        guard let troop = world.localTroop(hired: false) else { return }
+        let agrees = world.troopAgreesToFollow(troop)
+        world.setB(0x23, agrees ? 0 : 2)
+        let verb = Conversation(story: story, character: World.fremen, list: 5, mask: 0x20, oneList: true, single: true)
+        conversation = verb
+        showNextConversationPage()
+        verb.finishPending()
+        world.setB(0x23, 0)
+        if agrees && verb.gate != 0 {
+            if let phase = world.rallyTroop(troop) {
+                story.setGamePhase(phase)
+            }
+            dialogueCharacter = .fremen2
+            dialogueMenuItems = talkRows(.fremen2)
+            publishSietchRoom()
+        }
+        publishDialogueUI()
+    }
+
+    /// GIVE ORDERS TO TROOP: the contact verbs that are ported.
+    private func openTroopOrders() {
+        guard let troop = world.localTroop(hired: true) else { return }
+        dialogueContext = .troop
+        troopMenu = .orders
+        let job = world.troopByte(troop, 3) & 0x0F
+        let text = GameText.shared
+        troopRows = []
+        // The floppy has only CHANGE TROOP OCCUPATION (COMMAND 68).
+        if let row = (job == TroopJob.waitingForOrders ? text.findCommand("SELECT TROOP OCCUPATION") : nil)
+            ?? text.findCommand("CHANGE TROOP OCCUPATION") {
+            troopRows.append((nil, UInt16(row)))
+        }
+        if let row = text.findCommand("NO MORE ORDERS") { troopRows.append((0xFF, UInt16(row))) }
+        dialogueMenuItems = troopRows.map { $0.id }
+        publishDialogueUI()
+    }
+
+    /// The occupation rows (seg000:6a71): a waiting troop takes a
+    /// speciality; a spice troop mines or prospects; ecology needs Kynes met.
+    private func openOccupationMenu(_ troop: Int) {
+        troopMenu = .occupation
+        let job = world.troopByte(troop, 3) & 0x0F
+        let kynesMet = world.b(0x0A) & 0x20 != 0
+        let text = GameText.shared
+        var rows: [(UInt8?, String)] = []
+        if job == TroopJob.waitingForOrders {
+            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (TroopJob.militaryTraining, "SPECIALIZE IN ARMY")]
+            if kynesMet { rows.append((TroopJob.irrigation, "SPECIALIZE IN ECOLOGY")) }
+        } else if job & 0x0C == 0 {
+            rows = [(TroopJob.spiceMining, "Spice Mining"), (TroopJob.prospecting, "Spice Prospection")]
+        } else if job & 0x0C == 4 {
+            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE")]
+            if kynesMet { rows.append((TroopJob.irrigation, "SPECIALIZE IN ECOLOGY")) }
+        } else {
+            rows = [((job & 0x0C) | 1, "ASSEMBLY WIND-TRAP"), (TroopJob.spiceMining, "SPECIALIZE IN SPICE"),
+                    (TroopJob.militaryTraining, "SPECIALIZE IN ARMY")]
+        }
+        rows.append((0xFF, "Cancel"))
+        troopRows = rows.compactMap { row in text.findCommand(row.1).map { (row.0, UInt16($0)) } }
+        dialogueMenuItems = troopRows.map { $0.id }
+        publishDialogueUI()
+    }
+
+    private func handleTroopMenu(_ index: Int) {
+        guard index >= 0 && index < troopRows.count, let troop = world.localTroop(hired: true) else { return }
+        let row = troopRows[index]
+        switch (troopMenu, row.job) {
+        case (.orders, nil):
+            openOccupationMenu(troop)
+        case (_, 0xFF):
+            dialogueContext = .sietch
+            dialogueMenuItems = talkRows(dialogueCharacter ?? .fremen2)
+            publishDialogueUI()
+        case (.occupation, let job?):
+            world.setTroopOccupation(troop, job)
+            engine.logger.log(.info, "Troops: troop \(troop) occupation \(job)")
+            openTroopOrders()
+        default:
+            break
+        }
     }
 
 
@@ -683,25 +780,7 @@ final class Game: DuneNode {
         let item = dialogueMenuItems[index]
 
         if dialogueContext == .troop {
-            switch item {
-            case 66:
-                gameState.setMilestone(.recruitFremen, action: "TROOP INFORMATION")
-            case 68:
-                sietchMenuMode = .occupation
-                dialogueCharacter = nil
-                publishSietchUI(items: sietchOccupationItems)
-            case 67:
-                gameState.setMilestone(.recruitFremen, action: "MODIFY EQUIPMENT")
-            case 69:
-                sietchMenuMode = .movement
-                dialogueCharacter = nil
-                publishSietchUI(items: sietchMovementItems)
-            case 72:
-                dialogueCharacter = nil
-                publishSietchUI(items: sietchRootCharacterItems())
-            default:
-                break
-            }
+            handleTroopMenu(index)
             return
         }
 
@@ -749,9 +828,9 @@ final class Game: DuneNode {
                 companionVerb(character)
             }
         case 136:
-            dialogueContext = .troop
-            dialogueMenuItems = [66, 68, 67, 69, 72]
-            publishDialogueUI()
+            openTroopOrders()
+        case 139:
+            workForMe()
         case 138: // WHAT ?
             showDialogueLine()
         case 137:
@@ -1273,7 +1352,7 @@ final class Game: DuneNode {
             publishMainUI()
         case 141:
             openMap(select: false, caption: true)
-        case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 132:
+        case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132:
             // The real room-person table places Leto in 0x200A, appearance
             // 0x0180. In PALACE.SAL room 0 that is marker 0, not intro
             // marker 8. Selecting his command returns to that room with the
@@ -1345,7 +1424,7 @@ final class Game: DuneNode {
             switch rootItems[index] {
             case 141:
                 openMap(select: false, caption: true)
-            case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 132:
+            case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132:
                 guard let speaker = character(forCommandItem: rootItems[index]) else { return }
                 beginDialogue(with: speaker, context: .sietch)
             default:

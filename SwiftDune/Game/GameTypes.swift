@@ -371,6 +371,9 @@ final class GameState {
         while tickAccumulator >= OriginalGameData.secondsPerGameTick {
             tickAccumulator -= OriginalGameData.secondsPerGameTick
             gameTicks &+= 1
+            // Each period runs the troops' jobs and the day's events.
+            World.shared.setW(World.gameTime, gameTicks)
+            World.shared.runPeriod()
         }
 
         World.shared.setW(World.gameTime, gameTicks)

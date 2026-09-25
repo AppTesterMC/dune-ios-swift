@@ -235,6 +235,8 @@ final class World {
     private(set) var isFloppy = true
     private(set) var loaded = false
     private(set) var palaceTable = 0
+    /// Mining's carried remainder under 10 kg (ds:46e1, outside the save).
+    var harvestRemainder = 0
     private(set) var pointerTable = 0
 
     private let logger = DuneEngine.shared.logger
@@ -346,6 +348,8 @@ final class World {
         vars[o + 1] = UInt8(value >> 8)
     }
     func rawB(_ o: Int) -> UInt8 { vars[o] }
+    /// Writes a byte at a raw segment offset (records: troops, places).
+    func setRawB(_ o: Int, _ value: UInt8) { vars[o] = value }
     func rawW(_ o: Int) -> UInt16 { w(raw: o) }
     private func w(raw o: Int) -> Int { Int(vars[o]) | Int(vars[o + 1]) << 8 }
     private func w(raw o: Int) -> UInt16 { UInt16(vars[o]) | UInt16(vars[o + 1]) << 8 }

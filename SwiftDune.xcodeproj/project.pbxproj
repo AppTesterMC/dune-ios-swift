@@ -69,6 +69,7 @@
 		0699D2772A93C702006287E0 /* Resource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D2762A93C702006287E0 /* Resource.swift */; };
 		0699D27E2A93D245006287E0 /* DuneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D27D2A93D245006287E0 /* DuneEngine.swift */; };
 		FD54F887CC1F14A06117DB51 /* DevHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */; };
+		24343016C3BE41F01CC75F0F /* Troops.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F067CE4C19703C0C16B488 /* Troops.swift */; };
 		1CA5770872B833AE650B24D0 /* FlatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4118702715A7040A55ED0D18 /* FlatMap.swift */; };
 		B71B1D88D129CDD65DD80E9E /* MapRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E782FDDAAE4F60AE4FCDAE65 /* MapRenderer.swift */; };
 		B927D3B299DFFF8E616B24DF /* SaveGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61DF0E4B664E3B3E4236F71 /* SaveGame.swift */; };
@@ -122,6 +123,7 @@
 		06CA2BBE2C7B350F00B47D13 /* Globe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DC67A22BE2320B0067DFEA /* Globe.swift */; };
 		06CA2BBF2C7B350F00B47D13 /* DuneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D27D2A93D245006287E0 /* DuneEngine.swift */; };
 		EE378917B4B4C3E7EAADEF81 /* DevHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */; };
+		3A469435DCFD29D7814170B9 /* Troops.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F067CE4C19703C0C16B488 /* Troops.swift */; };
 		5C1650446FB03C2B091679CA /* FlatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4118702715A7040A55ED0D18 /* FlatMap.swift */; };
 		CEAE6DB352D3E6248AA7EDB9 /* MapRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E782FDDAAE4F60AE4FCDAE65 /* MapRenderer.swift */; };
 		65CF87FF7D304A7E2493235C /* SaveGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = E61DF0E4B664E3B3E4236F71 /* SaveGame.swift */; };
@@ -210,6 +212,7 @@
 		0699D2762A93C702006287E0 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
 		0699D27D2A93D245006287E0 /* DuneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneEngine.swift; sourceTree = "<group>"; };
 		5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevHarness.swift; sourceTree = "<group>"; };
+		86F067CE4C19703C0C16B488 /* Troops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/Troops.swift; sourceTree = SOURCE_ROOT; };
 		4118702715A7040A55ED0D18 /* FlatMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/Scenes/FlatMap.swift; sourceTree = SOURCE_ROOT; };
 		E782FDDAAE4F60AE4FCDAE65 /* MapRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/MapRenderer.swift; sourceTree = SOURCE_ROOT; };
 		E61DF0E4B664E3B3E4236F71 /* SaveGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/SaveGame.swift; sourceTree = SOURCE_ROOT; };
@@ -426,6 +429,7 @@
 				063549442B1D04E200885655 /* Resources */,
 				0699D27D2A93D245006287E0 /* DuneEngine.swift */,
 				5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */,
+				86F067CE4C19703C0C16B488 /* Troops.swift */,
 				4118702715A7040A55ED0D18 /* FlatMap.swift */,
 				E782FDDAAE4F60AE4FCDAE65 /* MapRenderer.swift */,
 				E61DF0E4B664E3B3E4236F71 /* SaveGame.swift */,
@@ -634,6 +638,7 @@
 				06AB96D52BEB7DC300482823 /* Attack.swift in Sources */,
 				0699D27E2A93D245006287E0 /* DuneEngine.swift in Sources */,
 				FD54F887CC1F14A06117DB51 /* DevHarness.swift in Sources */,
+				24343016C3BE41F01CC75F0F /* Troops.swift in Sources */,
 				1CA5770872B833AE650B24D0 /* FlatMap.swift in Sources */,
 				B71B1D88D129CDD65DD80E9E /* MapRenderer.swift in Sources */,
 				B927D3B299DFFF8E616B24DF /* SaveGame.swift in Sources */,
@@ -724,6 +729,7 @@
 				06CA2BBE2C7B350F00B47D13 /* Globe.swift in Sources */,
 				06CA2BBF2C7B350F00B47D13 /* DuneEngine.swift in Sources */,
 				EE378917B4B4C3E7EAADEF81 /* DevHarness.swift in Sources */,
+				3A469435DCFD29D7814170B9 /* Troops.swift in Sources */,
 				5C1650446FB03C2B091679CA /* FlatMap.swift in Sources */,
 				CEAE6DB352D3E6248AA7EDB9 /* MapRenderer.swift in Sources */,
 				65CF87FF7D304A7E2493235C /* SaveGame.swift in Sources */,
