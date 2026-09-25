@@ -5,7 +5,7 @@
 name: SwiftDuneiOS
 options:
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "16.0"   # the test phone (iPhone 14 Pro) runs iOS 16.4.1 via TrollStore; do not raise
 settings:
   base:
     SWIFT_VERSION: "5.0"

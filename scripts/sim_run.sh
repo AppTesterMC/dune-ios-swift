@@ -23,12 +23,17 @@ hid_idle() { ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000
 while (( $(hid_idle) < idle_needed )); do sleep 30; done
 print "user idle for $(hid_idle)s, starting test"
 
-udid_file=build/sim-udid
+# Prefer the iOS 16.4 runtime (the phone runs iOS 16.4.1); fall back to the
+# newest installed one. The UDID file records which runtime it was made for.
+runtime=$(xcrun simctl list runtimes | awk '/iOS-16-4/ {print $NF}' | tail -1)
+[[ -n $runtime ]] || runtime=$(xcrun simctl list runtimes | awk '/iOS/ {print $NF}' | tail -1)
+udid_file=build/sim-udid-${runtime##*.}
 if [[ ! -s $udid_file ]] || ! xcrun simctl list devices | grep -q "$(cat $udid_file)"; then
   mkdir -p build
-  xcrun simctl create "iPhone 14 Pro (Dune)" com.apple.CoreSimulator.SimDeviceType.iPhone-14-Pro \
-    "$(xcrun simctl list runtimes | awk '/iOS/ {print $NF}' | tail -1)" > $udid_file
+  xcrun simctl create "iPhone 14 Pro (Dune ${runtime##*SimRuntime.})" \
+    com.apple.CoreSimulator.SimDeviceType.iPhone-14-Pro "$runtime" > $udid_file
 fi
+print "simulator runtime: $runtime"
 sim=$(cat $udid_file)
 xcrun simctl boot $sim 2>/dev/null || true
 
