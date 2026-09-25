@@ -67,10 +67,14 @@ final class Palace: DuneNode {
     /// does (last marker first, see World.markerAssignment).
     private func applyPeople() {
         guard let people = people, let scenery = palaceScenery, let sal = salRoomIndex,
-              sal >= 0 && sal < scenery.rooms.count else { return }
+              sal >= 0 && sal < scenery.rooms.count else {
+            engine.logger.log(.debug, "applyPeople skipped: people \(String(describing: people)) scenery \(palaceScenery != nil) sal \(String(describing: salRoomIndex))")
+            return
+        }
         let assignment = World.shared.markerAssignment(people: people, markers: scenery.rooms[sal].markerCount)
         markers = assignment.compactMapValues { RoomCharacter(rawValue: World.persFrame($0)) }
         scenery.characters = markers
+        engine.logger.log(.debug, "applyPeople sal \(sal) markers \(scenery.rooms[sal].markerCount) people \(people) -> \(assignment)")
     }
     
     

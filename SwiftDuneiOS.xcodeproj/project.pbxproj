@@ -34,6 +34,7 @@
 		5FC735C56A91087AE345A503 /* Primitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD4409A048F5C483FEAA36EE /* Primitives.swift */; };
 		66731D85B95041DC86BF4FA7 /* OPL3Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081B8A3714FF9FBA7F4F81E5 /* OPL3Channel.swift */; };
 		691A495EC467ABF54D5E6051 /* DesertWalk.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05C7231919B69A73A0580F7 /* DesertWalk.swift */; };
+		6B9CE5BFDFEB6229C6C7EAC1 /* Dialogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3B70E87F231AB33831B982 /* Dialogue.swift */; };
 		6DF94C14C951EBB7FA8B43AA /* Kiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = 126B2C7C8DBC2ACCF8D7B119 /* Kiss.swift */; };
 		6EA9FD66C72FC129D5B16E7D /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = 966DD802EC142B64CE737FE9 /* Game.swift */; };
 		708231813C1A71796D0CC8F7 /* Palace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54D7F2800E07FF9121E0AAE3 /* Palace.swift */; };
@@ -56,6 +57,7 @@
 		BC050C6B70287CA6375E8F8E /* Mouse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 995DF638959C024CCB38F598 /* Mouse.swift */; };
 		BD7FE5AA0209058F36A22172 /* Resource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B81D2038E35642788D4E84 /* Resource.swift */; };
 		BE4B17F7628948C848815F15 /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D51AD03082B32FE726F3571 /* Renderer.swift */; };
+		C128E2F5EA00F32680FD4BC4 /* SaveGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */; };
 		C36960045AA22DE43AFD2E75 /* CreativeVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012BB2796B1508FB96E38D5A /* CreativeVoice.swift */; };
 		C6F4017FEFD0140331DF5D14 /* Presents.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAFE284DE31237B53D5FC73A /* Presents.swift */; };
 		C83CBFB37121CE1BF28D70B2 /* Logo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3ADA3F49410B233337EF0C7 /* Logo.swift */; };
@@ -147,6 +149,7 @@
 		C8F3A7F73704B0FFBE303441 /* Credits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credits.swift; sourceTree = "<group>"; };
 		D83B000A1E76930997D01267 /* Video.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Video.swift; sourceTree = "<group>"; };
 		DA6E986FCF4CADAC004230F2 /* OPL3Envelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Envelope.swift; sourceTree = "<group>"; };
+		DB3B70E87F231AB33831B982 /* Dialogue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Dialogue.swift; sourceTree = "<group>"; };
 		E1B67CD39C4ED53732D0AD6D /* HERAD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HERAD.swift; sourceTree = "<group>"; };
 		E24791A4FCCB8FADF4A51268 /* WormCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WormCall.swift; sourceTree = "<group>"; };
 		E417D53CB37BF4C071341E5B /* Scenery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scenery.swift; sourceTree = "<group>"; };
@@ -156,6 +159,7 @@
 		EAFE284DE31237B53D5FC73A /* Presents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presents.swift; sourceTree = "<group>"; };
 		EB12408828DD78414D418946 /* LogoSwap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoSwap.swift; sourceTree = "<group>"; };
 		ED17296284B474C821364179 /* OPL3Chip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Chip.swift; sourceTree = "<group>"; };
+		EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGame.swift; sourceTree = "<group>"; };
 		EF83496DB89C3E7F819D3F67 /* Keyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keyboard.swift; sourceTree = "<group>"; };
 		F3ADA3F49410B233337EF0C7 /* Logo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logo.swift; sourceTree = "<group>"; };
 		F696A1767CFAFC7A1AF2A257 /* Death.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Death.swift; sourceTree = "<group>"; };
@@ -233,7 +237,9 @@
 		61A6779596F83CC88DC80D0B /* World */ = {
 			isa = PBXGroup;
 			children = (
+				DB3B70E87F231AB33831B982 /* Dialogue.swift */,
 				7DBAADC5F5BE640A1807A779 /* GameText.swift */,
+				EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */,
 				41386BC22871F9E97BBE2687 /* World.swift */,
 			);
 			path = World;
@@ -435,6 +441,7 @@
 				E88E2CC29A5A1154ED1E2A9A /* Death.swift in Sources */,
 				691A495EC467ABF54D5E6051 /* DesertWalk.swift in Sources */,
 				74526E2E06A6BE6A7A0EDCF0 /* DevHarness.swift in Sources */,
+				6B9CE5BFDFEB6229C6C7EAC1 /* Dialogue.swift in Sources */,
 				0C01AC13E0C90AE29E1D0053 /* DialogueOverlay.swift in Sources */,
 				2657FAEE4A9F7C3BC25E5DF3 /* DuneEngine.swift in Sources */,
 				E8488A747E7832B0A818EBA3 /* DuneIOSApp.swift in Sources */,
@@ -479,6 +486,7 @@
 				DE612A14F34FD75944036DE1 /* Queue.swift in Sources */,
 				BE4B17F7628948C848815F15 /* Renderer.swift in Sources */,
 				BD7FE5AA0209058F36A22172 /* Resource.swift in Sources */,
+				C128E2F5EA00F32680FD4BC4 /* SaveGame.swift in Sources */,
 				55B568F566762A0293DCC8B3 /* Scenery.swift in Sources */,
 				1E154D72CD8AC522AC7E5547 /* Sentence.swift in Sources */,
 				08F71540CE2D34A159788D85 /* Shaders.metal in Sources */,

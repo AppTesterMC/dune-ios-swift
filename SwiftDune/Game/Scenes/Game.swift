@@ -702,7 +702,9 @@ final class Game: DuneNode {
         if findNode("UI") == nil {
           attachNode(UI())
         }
-        setNodeActive("UI", true)
+        // The panel is drawn over the room (same priority would leave the
+        // order to activation order).
+        setNodeActive("UI", true, .foreground)
     }
     
     

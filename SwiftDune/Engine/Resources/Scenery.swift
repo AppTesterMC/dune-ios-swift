@@ -177,9 +177,12 @@ final class Scenery {
         let roomCount = firstOffset / 2
         var i = 0
 
-        resource.stream!.seek(UInt32(firstOffset))
-
         while i < roomCount {
+            // Each room starts at its entry in the offset table. Reading them
+            // back to back left the stream on the previous room's FF FF end,
+            // so every room after the first read 0xFF as its marker count.
+            resource.stream!.seek(UInt32(i * 2))
+            resource.stream!.seek(UInt32(resource.stream!.readUInt16LE()))
             var room = Room(offset: resource.stream!.offset)
             room.markerCount = Int(resource.stream!.readByte())
             var markerIndex = 0
