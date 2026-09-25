@@ -6,6 +6,10 @@
 #   scripts/sim_run.sh <run-name> <seconds> [DUNE_START=game] [DUNE_SCRIPT=...]
 #
 # The simulator is created on first use and its UDID kept in build/sim-udid.
+# The user asked (2026-09-25) for tests to run only while they are not using
+# the laptop: the script waits until keyboard/mouse have been idle for
+# DUNE_IDLE_SECONDS (default 300), runs headless (no Simulator.app window) and
+# shuts the simulator down afterwards.
 
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,6 +17,12 @@ run="$1"; seconds="$2"; shift 2
 bundle=com.apptestermc.swiftdune
 
 cd "$repo_root"
+
+idle_needed=${DUNE_IDLE_SECONDS:-300}
+hid_idle() { ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'; }
+while (( $(hid_idle) < idle_needed )); do sleep 30; done
+print "user idle for $(hid_idle)s, starting test"
+
 udid_file=build/sim-udid
 if [[ ! -s $udid_file ]] || ! xcrun simctl list devices | grep -q "$(cat $udid_file)"; then
   mkdir -p build
@@ -39,4 +49,5 @@ rm -rf "$out"; mkdir -p "$out"
 cp -R "$data/Documents/shots/." "$out/" 2>/dev/null || true
 cp "$data/Documents/dune-ios.log" "$out/" 2>/dev/null || true
 xcrun simctl io $sim screenshot "$out/device.png" >/dev/null 2>&1 || true
+xcrun simctl shutdown $sim 2>/dev/null || true
 print "OUT=$out"; ls "$out"
