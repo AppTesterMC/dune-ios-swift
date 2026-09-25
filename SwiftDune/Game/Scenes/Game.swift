@@ -758,7 +758,8 @@ final class Game: DuneNode {
         }
         findNode("Dialogue")?.params = [
             "text": page,
-            "speaker": dialogueCharacterName(dialogueCharacter ?? .none)
+            "speaker": dialogueCharacterName(dialogueCharacter ?? .none),
+            "speakerNumber": conversation.character
         ]
         setNodeActive("Dialogue", true, .foreground)
         return true

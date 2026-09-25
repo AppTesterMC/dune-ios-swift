@@ -15,6 +15,10 @@ final class DialogueOverlay: DuneNode {
     private var phrases: Sentence?
     private var phraseIndex: UInt16 = 0
     private var text: String?
+    /// The speaker's DIALOGUE character number (for the balloon's place).
+    private var speakerNumber = 0
+    private var icons: Sprite?
+    private let tiles = PixelBuffer(width: 320, height: 200)
     private var speaker = ""
 
     init() {
@@ -23,6 +27,7 @@ final class DialogueOverlay: DuneNode {
 
     override func onEnable() {
         font = GameFont()
+        icons = Sprite("ICONES.HSQ")
         phrases = Sentence(.phrase1, language: .english)
     }
 
@@ -45,10 +50,64 @@ final class DialogueOverlay: DuneNode {
         if let speaker = params["speaker"] as? String {
             self.speaker = speaker
         }
+        if let number = params["speakerNumber"] as? Int {
+            speakerNumber = number
+        }
     }
+
+    /// The three voice balloons (ds:2224): x, y, width, height.
+    private static let balloons: [(Int, Int, Int, Int)] = [(80, 14, 192, 72), (80, 16, 200, 86), (80, 8, 208, 97)]
+    /// Right edge of each talking head's mouth box (ds:27fa).
+    private static let mouthRight = [99, 105, 140, 101, 104, 114, 109, 114, 101, 113, 126, 120, 84, 86, 119, 137, 100]
+
+    /// A conversation page in the original's balloon: ICONES 0x1C tiled
+    /// over the first balloon tall enough, right of the speaker's mouth,
+    /// the text on 10-pixel lines (ScummVM GameScreen::drawTalk/drawBubble).
+    private func renderBalloon(_ page: String, _ buffer: PixelBuffer, _ font: GameFont, _ icons: Sprite) {
+        let head = min(max(speakerNumber, 0), 16)
+        var chosen = DialogueOverlay.balloons[2]
+        var lines = 0
+        for balloon in DialogueOverlay.balloons {
+            let left = max(balloon.0, DialogueOverlay.mouthRight[head] + 24)
+            let width = min(320, balloon.0 + balloon.2 + 24) - left
+            lines = font.lineCount(page, width: width - 24, style: .normal)
+            chosen = balloon
+            if lines * 10 + 32 <= balloon.3 { break }
+        }
+        let left = max(chosen.0, DialogueOverlay.mouthRight[head] + 24)
+        let right = min(320, chosen.0 + chosen.2 + 24)
+        let top = chosen.1, height = chosen.3
+
+        icons.setPalette()
+        // Tile into a scratch buffer, then copy only the balloon's box.
+        tiles.clearBuffer()
+        var y = 0
+        while y < height {
+            var x = 0
+            while x < right - left {
+                icons.drawFrame(0x1C, x: Int16(x), y: Int16(y), buffer: tiles)
+                x += 33
+            }
+            y += 29
+        }
+        for row in 0..<height where top + row < buffer.height {
+            for column in 0..<(right - left) {
+                buffer.rawPointer[(top + row) * buffer.width + left + column] = tiles.rawPointer[row * tiles.width + column]
+            }
+        }
+        font.paletteIndex = 0
+        font.render(page, rect: DuneRect(Int16(left + 12), Int16(top), UInt16(right - left - 24), UInt8(height)),
+                    buffer: buffer, alignment: .justify, style: .normal)
+    }
+
 
     override func render(_ buffer: PixelBuffer) {
         guard let font = font, let phrases = phrases else { return }
+
+        if let page = text, let icons = icons {
+            renderBalloon(page, buffer, font, icons)
+            return
+        }
 
         // Keep the room visible and use the dark subtitle strip below the
         // animation. The normal HUD remains available after the line closes.
