@@ -304,6 +304,12 @@ final class World {
     /// ds:11EB (CD): 16 sentence ids read by the text codes 0x81-0x8F.
     var nameTable: Int { 0x11EB + (palaceTable - 0x1225) }
 
+    /// A save's segment prefix; the rest keeps the executable's values.
+    func restore(_ saved: [UInt8]) {
+        reset()
+        vars.replaceSubrange(0..<min(saved.count, World.size), with: saved.prefix(World.size))
+    }
+
     /// Back to the executable's state (new game).
     func reset() {
         if !initialVars.isEmpty {

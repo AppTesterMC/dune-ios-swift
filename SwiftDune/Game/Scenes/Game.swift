@@ -77,10 +77,12 @@ final class Game: DuneNode {
       sietchMenuMode = .root
       gameState.reset()
       story.newGame()
-      
-      showRoom()
+      if let slot = DevHarness.shared.loadSlot, SaveGame.shared.load(slot) {
+          gameState.reset() // the clock from the loaded segment
+      }
+
       showUI()
-      publishMainUI()
+      showCurrentPlace()
     }
   
     func showRoom() {
@@ -119,6 +121,32 @@ final class Game: DuneNode {
           attachNode(palaceNode)
           setNodeActive("Palace", true)
         }
+    }
+
+
+    /// Shows wherever the data segment says Paul is (new game or a load).
+    func showCurrentPlace() {
+        if world.placeType <= Location.sietchMax && world.currentRoomRecord() != nil {
+            if findNode("Sietch") == nil {
+                attachNode(Sietch())
+            }
+            gameState.setLocation(world.currentLocation)
+            sietchActive = true
+            sietchMenuMode = .root
+            setNodeActive("Palace", false)
+            publishSietchRoom()
+            setNodeActive("Sietch", true, .background)
+            setNodeActive("UI", true, .foreground)
+            publishSietchUI(items: sietchRootCharacterItems())
+            return
+        }
+        if world.placeType != Location.palace || world.currentRoomRecord() == nil {
+            // Villages, fortresses and the desert are not ported yet.
+            engine.logger.log(.warn, "showCurrentPlace: place type \(world.placeType) not ported, showing the palace front")
+            world.setPosition(location: 0, room: 1)
+        }
+        showRoom()
+        publishMainUI()
     }
 
 

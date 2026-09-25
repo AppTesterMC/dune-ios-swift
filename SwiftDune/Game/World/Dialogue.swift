@@ -132,6 +132,11 @@ final class DialogueData {
 
     func reset() { data = initial }
 
+    /// A save's copy, said flags included.
+    func setData(_ saved: [UInt8]) {
+        if saved.count == data.count { data = saved }
+    }
+
     func listOffset(character: Int, list: Int) -> Int {
         let index = character * DialogueData.listsPerCharacter + list
         guard data.count >= 2, index < (Int(data[0]) | Int(data[1]) << 8) / 2 else { return 0 }
@@ -301,6 +306,23 @@ final class Story {
     }
 
     var phase: UInt8 { world.b(World.phase) }
+
+    /// After a load: the book's journal from the said lines with a topic.
+    func rebuildNotebook() {
+        notebook = []
+        for character in 0..<17 {
+            for list in 0..<DialogueData.listsPerCharacter {
+                var offset = dialogue.listOffset(character: character, list: list)
+                while let entry = dialogue.entry(at: offset) {
+                    if entry.said && entry.topic != 0 {
+                        let record = UInt16(character << 11 | offset / 4)
+                        if !notebook.contains(record) { notebook.append(record) }
+                    }
+                    offset += 4
+                }
+            }
+        }
+    }
 
     /// Does `character` have a line in `list` whose condition holds now?
     func hasLine(character: Int, list: Int, mask: UInt8 = 0x80) -> Bool {
