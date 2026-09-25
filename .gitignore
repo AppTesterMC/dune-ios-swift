@@ -4,3 +4,5 @@ run_dosbox.sh
 reference/
 builds/
 .DS_Store
+build/
+*.ipa

@@ -61,7 +61,8 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         // Load the shader files.  A development build can be launched before
         // Xcode has installed its optional Metal Toolchain; keep that case a
         // black but usable window instead of crashing during app startup.
-        let defaultLibrary = try? device.makeDefaultLibrary(bundle: Bundle.main)
+        let defaultLibrary = (try? device.makeDefaultLibrary(bundle: Bundle.main))
+            ?? (try? device.makeLibrary(source: Renderer.shaderSource, options: nil))
         let vertexFunction = defaultLibrary?.makeFunction(name: "vertex_main")
         let fragmentFunction = defaultLibrary?.makeFunction(name: "fragment_main")
         
@@ -100,6 +101,37 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
     deinit {
         rawBufferPointer.deallocate()
     }
+
+
+    /// Same program as Shaders.metal, compiled at runtime when the bundle has
+    /// no default.metallib (builds made without the Metal toolchain).
+    /// Keep the two in sync.
+    private static let shaderSource = """
+    #include <metal_stdlib>
+    using namespace metal;
+
+    struct VertexIn {
+        float4 position [[attribute(0)]];
+        float2 texCoord [[attribute(1)]];
+    };
+
+    struct VertexOut {
+        float4 position [[position]];
+        float2 texCoord;
+    };
+
+    vertex VertexOut vertex_main(VertexIn in [[stage_in]]) {
+        VertexOut out;
+        out.position = in.position;
+        out.texCoord = in.texCoord;
+        return out;
+    }
+
+    fragment float4 fragment_main(VertexOut in [[stage_in]], texture2d<float> texture [[texture(0)]]) {
+        constexpr sampler s(address::clamp_to_edge, filter::nearest);
+        return texture.sample(s, in.texCoord);
+    }
+    """
     
     
     func update(_ buffer: PixelBuffer) {
@@ -207,7 +239,7 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         // Create a destination URL
         let date = NSDate()
         let fileName = "DuneCapture_\(date.timeIntervalSince1970)@\(scale)x.png"
-        let downloadsDirectory = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+        let downloadsDirectory = DuneEngine.outputDirectory
         let fileURL = downloadsDirectory.appendingPathComponent(fileName)
         
         // Create a CGImageDestination
