@@ -132,6 +132,7 @@
 		06FC4EF42E657A0B00F68119 /* HERAD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FC4EF22E657A0800F68119 /* HERAD.swift */; };
 		06FC4EF62E66C6AC00F68119 /* CreativeVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FC4EF52E66C6A600F68119 /* CreativeVoice.swift */; };
 		06FC4EF72E66C6AC00F68119 /* CreativeVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06FC4EF52E66C6A600F68119 /* CreativeVoice.swift */; };
+		06F9D0012F00000100F68119 /* DialogueOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06F9D0002F00000100F68119 /* DialogueOverlay.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -228,6 +229,7 @@
 		06F8068F2CB2D99C00C70D58 /* Music.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Music.swift; sourceTree = "<group>"; };
 		06FC4EF22E657A0800F68119 /* HERAD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HERAD.swift; sourceTree = "<group>"; };
 		06FC4EF52E66C6A600F68119 /* CreativeVoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreativeVoice.swift; sourceTree = "<group>"; };
+		06F9D0002F00000100F68119 /* DialogueOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogueOverlay.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -458,6 +460,7 @@
 			children = (
 				068965B72B5F046A005A19D7 /* UI.swift */,
 				06B812CC2BB559B90048C8AC /* PrologueSubtitle.swift */,
+				06F9D0002F00000100F68119 /* DialogueOverlay.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -606,6 +609,7 @@
 				064103D12CCF746800369239 /* Background.swift in Sources */,
 				066D9D3B2B4A9EC40003ADD3 /* LogoSwap.swift in Sources */,
 				06CA2B8B2C7A7D8700B47D13 /* Game.swift in Sources */,
+				06F9D0012F00000100F68119 /* DialogueOverlay.swift in Sources */,
 				06243A1C2A9B6E8800981BCC /* Palette.swift in Sources */,
 				06547D062C6D4F7D008E5C64 /* WormRide.swift in Sources */,
 				06C16D872B1C8F0100CBEAA2 /* PixelBuffer.swift in Sources */,

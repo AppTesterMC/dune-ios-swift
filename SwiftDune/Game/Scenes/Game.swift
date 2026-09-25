@@ -8,7 +8,7 @@
 import Foundation
 
 final class Game: DuneNode {
-    private let mainMenuItems: [UInt16] = [141, 109, 214]
+    private var mainMenuItems: [UInt16] = [141, 109]
     // Palace scene records copied from dune-re-ref's palace_rooms table.
     // Exit order is UP, RIGHT, DOWN, LEFT; values 1...12 are destination
     // room ids and values with bit 0x80 are special desert exits.
@@ -38,6 +38,16 @@ final class Game: DuneNode {
     private var currentMarkers: [Int: RoomCharacter] = [0: .leto]
     private var dialogueCharacter: DuneCharacter?
     private var lastDialogueCharacter: DuneCharacter?
+    private var dialogueMenuItems: [UInt16] = []
+    private var dialogueContext: DialogueContext = .palace
+    private var dialoguePhraseOverride: Int?
+
+    private enum DialogueContext: Equatable {
+        case palace
+        case sietch
+        case troop
+        case shipment
+    }
     // The first two playable palace speakers are backed by the same marker
     // slots used by the extracted palace scene records.  Empty rooms remain
     // empty until their character records are decoded.
@@ -51,7 +61,6 @@ final class Game: DuneNode {
     ]
     private let menuRect = DuneRect(92, 159, 136, 40)
     // Exact English COMMAND1.HSQ records used by the original command menus.
-    private let sietchRootItems: [UInt16] = [133, 134, 135, 136, 141]
     private let sietchOrderItems: [UInt16] = [67, 68, 69, 70, 71]
     private let sietchOccupationItems: [UInt16] = [106, 107, 108, 71]
     private let sietchMovementItems: [UInt16] = [77, 78, 79, 80, 81]
@@ -80,6 +89,9 @@ final class Game: DuneNode {
       currentMarkers = [0: .leto] // person 0, first marker in throne-room SAL 0
       dialogueCharacter = nil
       lastDialogueCharacter = nil
+      dialogueMenuItems = []
+      dialogueContext = .palace
+      dialoguePhraseOverride = nil
       musicStarted = false
       desertActive = false
       sietchActive = false
@@ -185,6 +197,9 @@ final class Game: DuneNode {
         }
 
         let firstGameplaySietch = gameState.currentLocation == 12
+        if firstGameplaySietch {
+            gameState.advanceStory(to: 0x01, action: "FIRST SIETCH")
+        }
         if let sietch = findNode("Sietch") {
             sietch.params = [
                 "room": SietchRoom.room8,
@@ -205,7 +220,274 @@ final class Game: DuneNode {
         setNodeActive("Flight", false)
         setNodeActive("Sietch", true, .background)
         setNodeActive("UI", true, .foreground)
-        publishSietchUI(items: sietchRootItems)
+        publishSietchUI(items: sietchRootCharacterItems())
+    }
+
+
+    private func sietchRootCharacterItems() -> [UInt16] {
+        // This is the data-driven order seen in the original early sietch
+        // screens: map first, followed by the room-person records. The exact
+        // command strings come from COMMAND1.HSQ.
+        if gameState.currentLocation == 12 {
+            return [141, 124, 113, 117]
+        }
+        return [141, 124, 113, 117]
+    }
+
+
+    private func character(forCommandItem item: UInt16) -> DuneCharacter? {
+        switch item {
+        case 109: return .leto
+        case 110: return .jessica
+        case 111: return .thufir
+        case 112: return .duncan
+        case 113: return .gurney
+        case 114: return .stilgar
+        case 115: return .liet
+        case 116: return .chani
+        case 117: return .harah
+        case 124: return .fremen1
+        case 132: return .fremen2
+        default: return nil
+        }
+    }
+
+
+    private func roomCharacterItems() -> [UInt16] {
+        var items: [UInt16] = [141]
+        switch currentGameRoom {
+        case 10:
+            items.append(109) // Duke Leto
+            if gameState.storyPhase >= 0x01 { items.append(113) } // Gurney
+        case 4:
+            items.append(110) // Jessica
+            if gameState.storyPhase >= 0x01 { items.append(112) } // Duncan
+        case 8:
+            items.append(111) // Thufir
+        default:
+            break
+        }
+        return Array(items.prefix(5))
+    }
+
+
+    private func beginDialogue(with character: DuneCharacter, context: DialogueContext) {
+        dialogueContext = context
+        lastDialogueCharacter = character
+        dialogueCharacter = character
+        dialoguePhraseOverride = nil
+        dialogueMenuItems = context == .troop ? [66, 68, 67, 69, 72] : [133, 134, 138, 137]
+        showRoomOrSietch()
+        publishDialogueUI()
+    }
+
+
+    private func showRoomOrSietch() {
+        if sietchActive {
+            if let sietch = findNode("Sietch") {
+                sietch.params = [
+                    "room": SietchRoom.room8,
+                    "markers": gameState.currentLocation == 12 ? [:] : [6: RoomCharacter.harah, 9: RoomCharacter.stilgar],
+                    "character": dialogueCharacter ?? (gameState.currentLocation == 12 ? DuneCharacter.gurney : DuneCharacter.none)
+                ]
+            }
+            setNodeActive("Sietch", true, .background)
+        } else {
+            showRoom()
+        }
+    }
+
+
+    private func publishDialogueUI() {
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed,
+            rightPanel: .roomDirections,
+            items: dialogueMenuItems,
+            directions: sietchActive ? [] : roomDirections(),
+            day: gameState.day,
+            phase: gameState.phase
+        ))
+    }
+
+
+    private func phraseIndex(for character: DuneCharacter) -> Int {
+        let phase = gameState.storyPhase
+        switch character {
+        case .leto:
+            if phase >= 0x15 { return 14 } // Gurney has disappeared
+            return phase >= 0x01 ? 5 : 0
+        case .jessica:
+            if phase >= 0x4c { return 54 } // Duke Leto is dead
+            return phase >= 0x15 ? 72 : 53
+        case .duncan:
+            if gameState.shipmentPending { return 225 }
+            return gameState.prospectorFound ? 203 : 204
+        case .gurney:
+            return gameState.prospectorFound ? 301 : 285
+        case .thufir:
+            return 17
+        case .stilgar:
+            return 294
+        case .harah:
+            return 309
+        case .chani:
+            return 174
+        case .liet:
+            return 432
+        case .fremen1, .fremen2, .fremen3:
+            return 326
+        default:
+            return 0
+        }
+    }
+
+
+    private func showDialogueLine() {
+        if findNode("Dialogue") == nil {
+            attachNode(DialogueOverlay())
+        }
+        if let dialogue = findNode("Dialogue") {
+            dialogue.params = [
+                "phraseIndex": dialoguePhraseOverride ?? phraseIndex(for: dialogueCharacter ?? .none),
+                "speaker": dialogueCharacterName(dialogueCharacter ?? .none)
+            ]
+        }
+        setNodeActive("Dialogue", true, .foreground)
+    }
+
+
+    private func dialogueCharacterName(_ character: DuneCharacter) -> String {
+        switch character {
+        case .leto: return "LETO"
+        case .jessica: return "JESSICA"
+        case .thufir: return "THUFIR"
+        case .duncan: return "DUNCAN"
+        case .gurney: return "GURNEY"
+        case .stilgar: return "STILGAR"
+        case .harah: return "HARAH"
+        case .chani: return "CHANI"
+        case .liet: return "KYNES"
+        case .fremen1, .fremen2, .fremen3: return "FREMEN"
+        default: return ""
+        }
+    }
+
+
+    private func closeDialogueLine() {
+        setNodeActive("Dialogue", false)
+        dialoguePhraseOverride = nil
+        publishDialogueUI()
+    }
+
+
+    private func handleDialogueMenuClick(_ point: DunePoint) {
+        let index = Int((point.y - menuRect.y) / 8)
+        guard index >= 0 && index < dialogueMenuItems.count else { return }
+        let item = dialogueMenuItems[index]
+
+        if dialogueContext == .troop {
+            switch item {
+            case 66:
+                gameState.setMilestone(.recruitFremen, action: "TROOP INFORMATION")
+            case 68:
+                sietchMenuMode = .occupation
+                dialogueCharacter = nil
+                publishSietchUI(items: sietchOccupationItems)
+            case 67:
+                gameState.setMilestone(.recruitFremen, action: "MODIFY EQUIPMENT")
+            case 69:
+                sietchMenuMode = .movement
+                dialogueCharacter = nil
+                publishSietchUI(items: sietchMovementItems)
+            case 72:
+                dialogueCharacter = nil
+                publishSietchUI(items: sietchRootCharacterItems())
+            default:
+                break
+            }
+            return
+        }
+
+        if dialogueContext == .shipment {
+            switch item {
+            case 226: // ACCEPT
+                gameState.acceptSpiceShipment()
+                dialoguePhraseOverride = 259 // The spice has been shipped...
+                dialogueContext = sietchActive ? .sietch : .palace
+                dialogueMenuItems = [133, 134, 138, 137]
+                showDialogueLine()
+            case 227: // REFUSE
+                gameState.refuseSpiceShipment()
+                dialoguePhraseOverride = 268 // Don't tell me that you don't want to send...
+                dialogueContext = sietchActive ? .sietch : .palace
+                dialogueMenuItems = [133, 134, 138, 137]
+                showDialogueLine()
+            case 228: // ARGUE
+                gameState.argueSpiceShipment()
+                gameState.setMilestone(.shipmentRequested, action: "ARGUE SHIPMENT")
+                dialoguePhraseOverride = 229 // staged stock/demand alternative
+                showDialogueLine()
+            default:
+                break
+            }
+            return
+        }
+
+        switch item {
+        case 133:
+            if let character = dialogueCharacter {
+                if character == .duncan {
+                    gameState.beginDuncanShipmentConversation()
+                    if gameState.shipmentPending && gameState.storyPhase >= 0x15 {
+                        dialogueContext = .shipment
+                        dialogueMenuItems = [226, 227, 228]
+                    } else {
+                        dialogueContext = sietchActive ? .sietch : .palace
+                        dialogueMenuItems = [133, 134, 138, 137]
+                    }
+                } else if character == .leto {
+                    gameState.advanceStory(to: 0x01, action: "LETO: FIND GURNEY")
+                } else if character == .jessica {
+                    gameState.advanceStory(to: 0x01, action: "JESSICA: FIND GURNEY")
+                } else if character == .gurney {
+                    gameState.findProspectors()
+                }
+                showDialogueLine()
+            }
+        case 134:
+            gameState.setMilestone(.firstSietch, action: "COME WITH ME")
+            showDialogueLine()
+        case 135:
+            gameState.setMilestone(.firstSietch, action: "STAY HERE")
+            showDialogueLine()
+        case 136:
+            dialogueContext = .troop
+            dialogueMenuItems = [66, 68, 67, 69, 72]
+            publishDialogueUI()
+        case 138: // WHAT ?
+            showDialogueLine()
+        case 137:
+            dialogueCharacter = nil
+            dialoguePhraseOverride = nil
+            if sietchActive {
+                publishSietchUI(items: sietchRootCharacterItems())
+            } else {
+                publishMainUI()
+            }
+        default:
+            break
+        }
+    }
+
+
+    private func roomDirections() -> UIDirection {
+        var directions: UIDirection = []
+        let exits = palaceRoomExits[currentGameRoom]
+        if exits[0] != 0 { directions.insert(.up) }
+        if exits[1] != 0 { directions.insert(.right) }
+        if exits[2] != 0 { directions.insert(.down) }
+        if exits[3] != 0 { directions.insert(.left) }
+        return directions
     }
 
 
@@ -265,6 +547,11 @@ final class Game: DuneNode {
 
 
     override func onKey(_ key: DuneKeyEvent) {
+        if isOverlayActive("Dialogue") {
+            closeDialogueLine()
+            return
+        }
+
         if desertActive {
             if key.specialKey == .keyEscape {
                 leaveDesert()
@@ -291,6 +578,13 @@ final class Game: DuneNode {
         }
 
         if sietchActive {
+            if dialogueCharacter != nil {
+                if key.specialKey == .keyEscape {
+                    dialogueCharacter = nil
+                    publishSietchUI(items: sietchRootCharacterItems())
+                }
+                return
+            }
             if isOverlayActive("Fresk") {
                 if key.specialKey == .keyEscape || key.char.lowercased() == "m" {
                     closeOverlay()
@@ -306,6 +600,9 @@ final class Game: DuneNode {
                 showFresk()
             } else if key.char.lowercased() == "b" {
                 showBook()
+            } else if key.char.lowercased() == "p" {
+                gameState.findProspectors()
+                publishSietchUI(items: sietchRootCharacterItems())
             }
             return
         }
@@ -342,6 +639,12 @@ final class Game: DuneNode {
             return
         }
 
+        if key.char.lowercased() == "p" {
+            gameState.findProspectors()
+            publishMainUI()
+            return
+        }
+
         switch key.specialKey {
         case .keyLeft:
             moveRoom(.left)
@@ -365,6 +668,11 @@ final class Game: DuneNode {
 
 
     override func onClick(_ event: DuneMouseClickEvent) {
+        if isOverlayActive("Dialogue") {
+            closeDialogueLine()
+            return
+        }
+
         if desertActive {
             guard let desert = findNode("DesertWalk") as? DesertWalk else {
                 return
@@ -400,6 +708,13 @@ final class Game: DuneNode {
                     } else {
                         fresk.onClick(event)
                     }
+                }
+                return
+            }
+
+            if dialogueCharacter != nil {
+                if menuRect.contains(event.point) {
+                    handleDialogueMenuClick(event.point)
                 }
                 return
             }
@@ -444,14 +759,9 @@ final class Game: DuneNode {
         }
 
         if dialogueCharacter != nil {
-            if dialogueCharacter == .leto {
-                gameState.setMilestone(.findGurney, action: "LETO SPOKEN")
-            } else if dialogueCharacter == .jessica {
-                gameState.setMilestone(.firstSietch, action: "JESSICA SPOKEN")
+            if menuRect.contains(event.point) {
+                handleDialogueMenuClick(event.point)
             }
-            dialogueCharacter = nil
-            showRoom()
-            publishMainUI()
             return
         }
 
@@ -488,17 +798,15 @@ final class Game: DuneNode {
         switch mainMenuItems[index] {
         case 141:
             showFresk()
-        case 109:
+        case 109, 110, 111, 112, 113, 114, 115, 116, 117, 124, 132:
             // The real room-person table places Leto in 0x200A, appearance
             // 0x0180. In PALACE.SAL room 0 that is marker 0, not intro
             // marker 8. Selecting his command returns to that room with the
             // correct person slot populated.
-            guard let speaker = palaceRoomSpeakers[currentGameRoom] else { return }
-            lastDialogueCharacter = speaker
-            dialogueCharacter = speaker
-            gameState.setMilestone(speaker == .leto ? .meetDuke : .findGurney,
-                                   action: speaker == .leto ? "TALK TO LETO" : "TALK TO JESSICA")
-            showRoom()
+            let speaker = character(forCommandItem: mainMenuItems[index])
+                ?? palaceRoomSpeakers[currentGameRoom]
+            guard let speaker = speaker else { return }
+            beginDialogue(with: speaker, context: .palace)
         case 214:
             showBook()
         default:
@@ -533,7 +841,7 @@ final class Game: DuneNode {
 
     private func itemsForSietchMenu() -> [UInt16] {
         switch sietchMenuMode {
-        case .root: return sietchRootItems
+        case .root: return sietchRootCharacterItems()
         case .orders: return sietchOrderItems
         case .occupation: return sietchOccupationItems
         case .movement: return sietchMovementItems
@@ -559,19 +867,14 @@ final class Game: DuneNode {
 
         switch sietchMenuMode {
         case .root:
-            guard index < sietchRootItems.count else { return }
-            switch sietchRootItems[index] {
-            case 133:
-                gameState.setMilestone(.firstSietch, action: "TALK TO GURNEY")
-            case 134:
-                gameState.setMilestone(.firstSietch, action: "GURNEY COMES WITH PAUL")
-            case 135:
-                gameState.setMilestone(.firstSietch, action: "GURNEY STAYS HERE")
-            case 136:
-                sietchMenuMode = .orders
-                publishSietchUI(items: sietchOrderItems)
+            let rootItems = sietchRootCharacterItems()
+            guard index < rootItems.count else { return }
+            switch rootItems[index] {
             case 141:
                 showFresk()
+            case 109, 110, 111, 112, 113, 114, 115, 116, 117, 124, 132:
+                guard let speaker = character(forCommandItem: rootItems[index]) else { return }
+                beginDialogue(with: speaker, context: .sietch)
             default:
                 break
             }
@@ -590,7 +893,7 @@ final class Game: DuneNode {
                 gameState.setMilestone(.firstSietch, action: "NEXT TROOP")
             case 71:
                 sietchMenuMode = .root
-                publishSietchUI(items: sietchRootItems)
+                publishSietchUI(items: sietchRootCharacterItems())
             default:
                 break
             }
@@ -638,12 +941,8 @@ final class Game: DuneNode {
 
 
     private func publishMainUI() {
-        var directions: UIDirection = []
-        let exits = palaceRoomExits[currentGameRoom]
-        if exits[0] != 0 { directions.insert(.up) }
-        if exits[1] != 0 { directions.insert(.right) }
-        if exits[2] != 0 { directions.insert(.down) }
-        if exits[3] != 0 { directions.insert(.left) }
+        mainMenuItems = roomCharacterItems()
+        let directions = roomDirections()
 
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .bookClosed,

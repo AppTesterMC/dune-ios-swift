@@ -12,6 +12,8 @@ enum DuneCharacter: Equatable {
   case none
   case leto
   case jessica
+  case thufir
+  case duncan
   case gurney
   case paul
   case chani
@@ -31,6 +33,10 @@ enum DuneCharacter: Equatable {
       "LETO.HSQ"
     case .jessica:
       "JESS.HSQ"
+    case .thufir:
+      "HAWA.HSQ"
+    case .duncan:
+      "IDAH.HSQ"
     case .gurney:
       "GURN.HSQ"
     case .paul:

@@ -205,6 +205,9 @@ enum GameplayMilestone: String {
     case findGurney = "FIND GURNEY"
     case firstSietch = "FIRST SIETCH"
     case recruitFremen = "RECRUIT FREMEN"
+    case prospectorsFound = "FIND PROSPECTORS"
+    case shipmentRequested = "SPICE SHIPMENT"
+    case shipmentAccepted = "SHIPMENT ACCEPTED"
 }
 
 
@@ -265,6 +268,22 @@ final class GameState {
     private(set) var milestone: GameplayMilestone = .meetDuke
     private(set) var lastAction = "ARRIVAL"
 
+    // Story phase values are the phase bytes used by DUNEPRG.EXE/DNCDPRG.EXE.
+    // The Swift slice does not evaluate CONDIT.HSQ yet, but keeping the same
+    // byte milestones makes the visible branches line up with the original
+    // event callbacks and with dune-re's phase table.
+    private(set) var storyPhase: UInt8 = 0
+    private(set) var charisma: UInt8 = 0
+    private(set) var prospectorFound = false
+    private(set) var prospectorLocation = 2 // Carthag-Timin in the original troop table
+    private(set) var spiceStock: UInt16 = 0 // stored in 10 kg batches by the DOS game
+    private(set) var shipmentDemand: UInt16 = 0
+    private(set) var shipmentOfferAmounts: [UInt16] = []
+    private(set) var shipmentPending = false
+    private(set) var shipmentDaysRemaining: Int = 0
+    private var shipmentSequence: UInt8 = 0
+    private var randomSeed: UInt16 = 0
+
     // These are the current location's data-segment fields. They are kept as
     // raw game values until the location table decoder supplies labels and
     // scaling from the original binary.
@@ -293,6 +312,19 @@ final class GameState {
         troopOccupation = .none
         milestone = .meetDuke
         lastAction = "ARRIVAL"
+        storyPhase = 0
+        charisma = 0
+        prospectorFound = false
+        prospectorLocation = 2
+        spiceStock = 0
+        shipmentDemand = 0
+        shipmentOfferAmounts = []
+        shipmentPending = false
+        shipmentDaysRemaining = 0
+        shipmentSequence = 0
+        // The original seeds this LCG from the BIOS timer.  The algorithm is
+        // exact; a fixed seed keeps regression captures deterministic.
+        randomSeed = 0x7302
         spiceDensity = OriginalGameData.spiceDensity(for: 0)
         currentLocation = 0
         travelStep = 0
@@ -306,6 +338,7 @@ final class GameState {
         elapsedTime += elapsed
         tickAccumulator += elapsed
 
+        let oldDay = day
         while tickAccumulator >= OriginalGameData.secondsPerGameTick {
             tickAccumulator -= OriginalGameData.secondsPerGameTick
             gameTicks &+= 1
@@ -319,6 +352,17 @@ final class GameState {
         // four-part light presentation, so each displayed phase covers four
         // original hours without changing the raw clock semantics.
         phase = GamePhase.allCases[gameHour / 4]
+
+        if day != oldDay {
+            if shipmentPending && shipmentDaysRemaining > 0 {
+                shipmentDaysRemaining -= 1
+            }
+            // In the original, the first Emperor demand is armed by the
+            // first-vision callback (phase 0x15), not by entering a room.
+            if storyPhase >= 0x15 && !shipmentPending && shipmentDemand == 0 {
+                rollSpiceShipment()
+            }
+        }
     }
 
     func cycleTroopOrder() {
@@ -331,11 +375,117 @@ final class GameState {
     func setTroopOccupation(_ occupation: TroopOccupation) {
         troopOccupation = occupation
         lastAction = "OCCUPATION \(occupation.title)"
+        if occupation == .spice && !prospectorFound {
+            // The first spice specialization is the same gameplay gate that
+            // exposes the prospector branch in the original phase table.
+            findProspectors()
+        }
     }
 
     func setMilestone(_ milestone: GameplayMilestone, action: String) {
         self.milestone = milestone
         lastAction = action
+    }
+
+    func advanceStory(to phase: UInt8, action: String) {
+        storyPhase = max(storyPhase, phase)
+        lastAction = action
+        if phase >= 0x01 && milestone == .meetDuke {
+            milestone = .findGurney
+        }
+    }
+
+    func findProspectors() {
+        prospectorFound = true
+        storyPhase = max(storyPhase, 0x05)
+        milestone = .prospectorsFound
+        lastAction = "PROSPECTOR AT CARTHAG-TIMIN"
+    }
+
+    /// Exact port of dune-re's `spice_shipment_roll_new_demand` formula:
+    /// base = sequence * 150 + 100, scaled by (rand_masked(0x3f)+0xe0)/256.
+    /// The LCG is the same 16-bit `seed * 0xe56d + 1` generator.
+    func rollSpiceShipment() {
+        let sequence = UInt32(shipmentSequence)
+        shipmentSequence &+= 1
+        let base = sequence * 0x96 + 0x64
+        let random = UInt32(randMasked(0x3f)) + 0xe0
+        var quantity: UInt16
+        if base > 0xffff || base * random > 0xffffff {
+            quantity = 0xffff
+        } else {
+            quantity = UInt16((base * random) >> 8)
+        }
+        shipmentDemand = quantity
+        shipmentOfferAmounts = [quantity, quantity / 2, quantity / 4]
+        shipmentPending = true
+        shipmentDaysRemaining = 4
+        milestone = .shipmentRequested
+        lastAction = "EMPEROR DEMANDS \(quantity * 10) KGS"
+    }
+
+    private func randMasked(_ mask: UInt16) -> UInt16 {
+        let product = UInt32(randomSeed) * 0xe56d
+        randomSeed = UInt16(truncatingIfNeeded: product).addingReportingOverflow(1).partialValue
+        let lo = randomSeed >> 8
+        let hi = UInt16((product >> 16) & 0xff)
+        return ((hi << 8) | lo) & mask
+    }
+
+    func beginDuncanShipmentConversation() {
+        if storyPhase < 0x15 {
+            lastAction = prospectorFound ? "DUNCAN: INCREASE SPICE PRODUCTION" : "DUNCAN: FIND PROSPECTORS"
+            return
+        }
+        if !shipmentPending {
+            rollSpiceShipment()
+        }
+        milestone = .shipmentRequested
+        lastAction = "DUNCAN: REVIEW SHIPMENT"
+    }
+
+    func acceptSpiceShipment(option: Int = 0) {
+        guard shipmentPending, shipmentOfferAmounts.indices.contains(option) else { return }
+        let amount = shipmentOfferAmounts[option]
+        spiceStock = spiceStock > amount ? spiceStock - amount : 0
+        shipmentPending = false
+        shipmentDemand = 0
+        shipmentDaysRemaining = 0
+        shipmentOfferAmounts = []
+        milestone = .shipmentAccepted
+        lastAction = "SHIP (amount * 10) KGS TO EMPEROR"
+    }
+
+    /// Port of dune-re's `stage_spice_argue_amounts_with_duncan`. The DOS
+    /// routine stages four stock/demand brackets; the later dialogue event
+    /// selects one of those entries when Paul accepts the negotiated offer.
+    func argueSpiceShipment() {
+        guard shipmentPending else { return }
+        let demand = shipmentDemand
+        let stock = spiceStock
+        let oneAndHalfDemand = demand &+ (demand >> 1)
+        let doubleDemand = demand &* 2
+        let halfStock = stock >> 1
+        let threeQuarterStock = (stock >> 2) &+ halfStock
+
+        if stock < demand {
+            shipmentOfferAmounts = [stock, threeQuarterStock, halfStock,
+                                    threeQuarterStock &- halfStock]
+        } else if stock < oneAndHalfDemand {
+            shipmentOfferAmounts = [demand, stock, threeQuarterStock, halfStock]
+        } else if stock < doubleDemand {
+            shipmentOfferAmounts = [demand, stock, threeQuarterStock,
+                                    oneAndHalfDemand]
+        } else {
+            shipmentOfferAmounts = [demand, stock, oneAndHalfDemand, doubleDemand]
+        }
+        lastAction = "ARGUE SHIPMENT AMOUNTS"
+    }
+
+    func refuseSpiceShipment() {
+        guard shipmentPending else { return }
+        shipmentPending = false
+        lastAction = "SPICE SHIPMENT REFUSED"
     }
 
     func setLocation(_ location: Int, spiceDensity: UInt8) {
