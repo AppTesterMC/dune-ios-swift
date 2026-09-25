@@ -10,6 +10,7 @@
 //    DUNE_START=game          skip logo/intro/credits/prologue
 //    DUNE_TIME=<n>            start the game clock (ds:2) at n (16 per day)
 //    DUNE_LOAD=<slot>         start from DUNE21S<slot>.SAV (0-4 ship with the game)
+//    DUNE_LOG_MEMORY=1        log the memory footprint every 5 s
 //    DUNE_SCRIPT=<steps>      ';'-separated "<seconds>:<action>[:<arg>]"
 //        key:<esc|ret|del|left|right|up|down|c>   press a key (c = one char)
 //        click:<x>,<y>                           click at a game pixel
@@ -29,6 +30,8 @@ final class DevHarness {
     let startInGame: Bool
     let startTime: UInt16?
     let loadSlot: Int?
+    private let logMemory: Bool
+    private var nextMemoryLog: TimeInterval = 0
 
     private struct Step {
         let time: TimeInterval
@@ -44,6 +47,7 @@ final class DevHarness {
         let environment = ProcessInfo.processInfo.environment
         startTime = environment["DUNE_TIME"].flatMap { UInt16($0) }
         loadSlot = environment["DUNE_LOAD"].flatMap { Int($0) }
+        logMemory = environment["DUNE_LOG_MEMORY"] != nil
         startInGame = environment["DUNE_START"]?.lowercased() == "game" || loadSlot != nil
 
         steps = (environment["DUNE_SCRIPT"] ?? "")
@@ -59,11 +63,28 @@ final class DevHarness {
 
     /// Called once per frame from the game loop, before input is processed.
     func tick(_ gameTime: TimeInterval, _ engine: DuneEngine) {
+        if logMemory && gameTime >= nextMemoryLog {
+            nextMemoryLog = gameTime + 5
+            engine.logger.log(.info, "memory \(String(format: "%.1f", DevHarness.footprintMB())) MB at \(Int(gameTime)) s")
+        }
         while let step = steps.first, step.time <= gameTime {
             steps.removeFirst()
             engine.logger.log(.info, "harness \(step.time)s \(step.action) \(step.argument)")
             perform(step, engine)
         }
+    }
+
+
+    /// phys_footprint, what iOS counts against the app's memory limit.
+    static func footprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
     }
 
 
