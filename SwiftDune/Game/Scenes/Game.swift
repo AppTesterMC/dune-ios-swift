@@ -88,6 +88,11 @@ final class Game: DuneNode {
 
       showUI()
       showCurrentPlace()
+      DevHarness.shared.handlers["place"] = { [weak self] argument in
+          guard let self = self, self.mapActive, let index = Int(argument) else { return }
+          self.flatMap.choose(index)
+          self.publishMapUI()
+      }
     }
   
     func showRoom() {

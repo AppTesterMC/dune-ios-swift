@@ -15,6 +15,7 @@
 //        click:<x>,<y>                           click at a game pixel
 //        hover:<x>,<y>                           move the pointer only
 //        shot:<name>                             write <name>.png (320x200 x3)
+//        place:<index>                           tap that place's icon on the flat map
 //      Times are seconds since the game loop started.
 //  Screenshots go to DuneEngine.outputDirectory/shots/.
 //
@@ -36,6 +37,8 @@ final class DevHarness {
     }
 
     private var steps: [Step] = []
+    /// Scene hooks for actions that need game knowledge (e.g. "place").
+    var handlers: [String: (String) -> Void] = [:]
 
     private init() {
         let environment = ProcessInfo.processInfo.environment
@@ -89,7 +92,11 @@ final class DevHarness {
         case "shot":
             engine.renderer.requestScreenshot(3, name: step.argument)
         default:
-            engine.logger.log(.warn, "harness: unknown action \(step.action)")
+            if let handler = handlers[step.action] {
+                handler(step.argument)
+            } else {
+                engine.logger.log(.warn, "harness: unknown action \(step.action)")
+            }
         }
     }
 }

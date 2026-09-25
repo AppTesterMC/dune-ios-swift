@@ -77,6 +77,14 @@ final class FlatMap: DuneNode {
     }
 
 
+    /// Chooses a place directly (dev harness).
+    func choose(_ index: Int) {
+        centreOn(index)
+        destination = index
+        captionUntil = 0
+    }
+
+
     /// A tap in the view: the place under it becomes the destination.
     /// Returns true when the tap was on the map.
     func tap(_ point: DunePoint) -> Bool {
