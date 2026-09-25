@@ -788,6 +788,74 @@ final class World {
     }
 
 
+    // MARK: Visions
+
+    static let visionQueue = 0x1190     // count byte, then 10 x (id word, place word)
+    static let visionType = 0xEA
+    static let paulEvents = 0x0A
+
+    var visionCount: Int { min(Int(b(World.visionQueue)), 10) }
+
+    func vision(_ index: Int) -> (id: UInt16, location: UInt16) {
+        (w(World.visionQueue + 1 + 4 * index), w(World.visionQueue + 3 + 4 * index))
+    }
+
+    /// seg000:29f0: nothing is queued before Paul's first vision.
+    func queueVision(_ id: UInt16, location: UInt16 = 0) {
+        guard b(World.paulEvents) & 1 != 0 else { return }
+        for i in 0..<visionCount where vision(i) == (id, location) { return }
+        if visionCount >= 10 { dequeueVision() }
+        let count = visionCount
+        setW(World.visionQueue + 1 + 4 * count, id)
+        setW(World.visionQueue + 3 + 4 * count, location)
+        setB(World.visionQueue, UInt8(count + 1))
+        DuneEngine.shared.logger.log(.info, "Vision: queued \(String(id, radix: 16))")
+    }
+
+    func dequeueVision() {
+        let count = visionCount
+        guard count > 0 else { return }
+        for i in 0..<9 {
+            setW(World.visionQueue + 1 + 4 * i, w(World.visionQueue + 5 + 4 * i))
+            setW(World.visionQueue + 3 + 4 * i, w(World.visionQueue + 7 + 4 * i))
+        }
+        setW(World.visionQueue + 37, 0)
+        setW(World.visionQueue + 39, 0)
+        setB(World.visionQueue, UInt8(count - 1))
+    }
+
+    /// seg000:2a51: a message delivered in person drops the sender's others.
+    func purgeVisions(sender: UInt8, location: UInt16) {
+        var kept: [(UInt16, UInt16)] = []
+        for i in 0..<visionCount {
+            let v = vision(i)
+            if UInt8(v.id >> 8) == sender && (sender != 0x0F || v.location == location) { continue }
+            kept.append(v)
+        }
+        for i in 0..<10 {
+            setW(World.visionQueue + 1 + 4 * i, i < kept.count ? kept[i].0 : 0)
+            setW(World.visionQueue + 3 + 4 * i, i < kept.count ? kept[i].1 : 0)
+        }
+        setB(World.visionQueue, UInt8(kept.count))
+    }
+
+    /// sub_11071: phase 0x15; Leto sets off, Gurney's record moves, ds:D5 =
+    /// 0xFF; Paul has had his vision; vision message 1 is queued. (The
+    /// Emperor's shipments start here too; they are not ported yet.)
+    func firstVision() {
+        setB(0xFF, 0)
+        setB(World.phase, 0x15)
+        vars[0xFDB] = 1
+        vars[0x1018] = 0x0B; vars[0x1019] = 0x20
+        vars[0x101A] = 0x80; vars[0x101B] = 0x01
+        vars[0xFE8] = 0x0A
+        setB(0xD5, 0xFF)
+        setB(World.paulEvents, b(World.paulEvents) | 1)
+        queueVision(1)
+        DuneEngine.shared.logger.log(.info, "Story: Paul's first vision (phase 0x15)")
+    }
+
+
     // MARK: Companions and rooms
 
     /// The record now stands where Paul is (STAY HERE, sent home).

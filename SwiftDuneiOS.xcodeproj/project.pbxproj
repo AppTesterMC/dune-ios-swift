@@ -32,6 +32,7 @@
 		53E840D58AE19F5C216845A5 /* OPL3SignalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA981EC2C4EEACB141DAC5B4 /* OPL3SignalSource.swift */; };
 		55B568F566762A0293DCC8B3 /* Scenery.swift in Sources */ = {isa = PBXBuildFile; fileRef = E417D53CB37BF4C071341E5B /* Scenery.swift */; };
 		5FC735C56A91087AE345A503 /* Primitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD4409A048F5C483FEAA36EE /* Primitives.swift */; };
+		60359D1F877B65E757A575ED /* OpenDesert.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6007AD05E00516F3582EFF3 /* OpenDesert.swift */; };
 		66731D85B95041DC86BF4FA7 /* OPL3Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 081B8A3714FF9FBA7F4F81E5 /* OPL3Channel.swift */; };
 		691A495EC467ABF54D5E6051 /* DesertWalk.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05C7231919B69A73A0580F7 /* DesertWalk.swift */; };
 		6B9CE5BFDFEB6229C6C7EAC1 /* Dialogue.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3B70E87F231AB33831B982 /* Dialogue.swift */; };
@@ -44,6 +45,7 @@
 		8BF55510EC2D3A6ECCB014BD /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9869974B569AB745BA111263 /* Event.swift */; };
 		92C291A159F21760AA2040FB /* Prologue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C71306981EBCB8273987E /* Prologue.swift */; };
 		97B9C2334C3C29253EA7EF20 /* Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A65C67DD10F826B528CE84 /* Effects.swift */; };
+		9A68E05B56A4A12A8832A35A /* FlatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A424E2236B26FE1AA258106C /* FlatMap.swift */; };
 		A0FF69C5D503BCDD5459A4F6 /* Sietch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9C69085AF261F5322A2B35 /* Sietch.swift */; };
 		A824394E8789098F999E6CCC /* Flight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159E74011B9FCF456A792355 /* Flight.swift */; };
 		A832F3C769ABDE450DC0D194 /* Globe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 877A9ECC2E6BF76E58F7BA61 /* Globe.swift */; };
@@ -60,12 +62,14 @@
 		C128E2F5EA00F32680FD4BC4 /* SaveGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */; };
 		C36960045AA22DE43AFD2E75 /* CreativeVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 012BB2796B1508FB96E38D5A /* CreativeVoice.swift */; };
 		C6F4017FEFD0140331DF5D14 /* Presents.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAFE284DE31237B53D5FC73A /* Presents.swift */; };
+		C7EDC664102123EB9825EA0B /* Troops.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED848A62BEDC228B03CCABC5 /* Troops.swift */; };
 		C83CBFB37121CE1BF28D70B2 /* Logo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3ADA3F49410B233337EF0C7 /* Logo.swift */; };
 		CDF84A6312175FBDFCB23EC1 /* Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07008EFEDB1BCE59323A7BB1 /* Background.swift */; };
 		CE597F6D582912E8087FBB67 /* GameTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C29FD2E9E41E5486D49300E /* GameTypes.swift */; };
 		D51758ECDCC4E603F5F5AC28 /* Character.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85DE6529940F5D8FA35FE98 /* Character.swift */; };
 		D601D790748A1DFFFD88A57E /* WormCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24791A4FCCB8FADF4A51268 /* WormCall.swift */; };
 		D9A79D17D6859E08AE065BD2 /* Sprite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 850C3BC698B9935363B2F854 /* Sprite.swift */; };
+		DA70C862F45730BB3B097555 /* MapRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D01507F2978E1BE26413C5 /* MapRenderer.swift */; };
 		DAC6ED537D3DAF0FC52C054B /* GameText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DBAADC5F5BE640A1807A779 /* GameText.swift */; };
 		DE612A14F34FD75944036DE1 /* Queue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7011AB9CAABA72B0283D919 /* Queue.swift */; };
 		E3F33E84AC532A68E0F8ADCF /* PixelBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614A6BFE79A0D88DF3EC7C6A /* PixelBuffer.swift */; };
@@ -104,6 +108,7 @@
 		3E387EDA4831F07D1922BFA7 /* DuneIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneIOSApp.swift; sourceTree = "<group>"; };
 		41386BC22871F9E97BBE2687 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
 		4353B53E70AE12D216242FE5 /* DuneTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneTitle.swift; sourceTree = "<group>"; };
+		44D01507F2978E1BE26413C5 /* MapRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapRenderer.swift; sourceTree = "<group>"; };
 		473FB8092A872F8EE45E771B /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		495E8D1A298936E97E9357AA /* OPL3Operator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Operator.swift; sourceTree = "<group>"; };
 		49785BB76D2B4F6FD6D92487 /* Intro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intro.swift; sourceTree = "<group>"; };
@@ -136,6 +141,7 @@
 		9F9C69085AF261F5322A2B35 /* Sietch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sietch.swift; sourceTree = "<group>"; };
 		A2A65C67DD10F826B528CE84 /* Effects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Effects.swift; sourceTree = "<group>"; };
 		A3BD8F93438D063F4396E68C /* Fresk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fresk.swift; sourceTree = "<group>"; };
+		A424E2236B26FE1AA258106C /* FlatMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlatMap.swift; sourceTree = "<group>"; };
 		A85DE6529940F5D8FA35FE98 /* Character.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Character.swift; sourceTree = "<group>"; };
 		AE1B92319AA70E511EFB90AD /* Music.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Music.swift; sourceTree = "<group>"; };
 		AFBC989350AA2E4F885CB9E8 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
@@ -146,6 +152,7 @@
 		BAB06338DF3047923FA9E7C5 /* Attack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attack.swift; sourceTree = "<group>"; };
 		C33501B88C934EC553E84E3D /* Sentence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sentence.swift; sourceTree = "<group>"; };
 		C40F00E311A9C9C2AF57DBEE /* Math.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Math.swift; sourceTree = "<group>"; };
+		C6007AD05E00516F3582EFF3 /* OpenDesert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenDesert.swift; sourceTree = "<group>"; };
 		C8F3A7F73704B0FFBE303441 /* Credits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credits.swift; sourceTree = "<group>"; };
 		D83B000A1E76930997D01267 /* Video.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Video.swift; sourceTree = "<group>"; };
 		DA6E986FCF4CADAC004230F2 /* OPL3Envelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Envelope.swift; sourceTree = "<group>"; };
@@ -159,6 +166,7 @@
 		EAFE284DE31237B53D5FC73A /* Presents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presents.swift; sourceTree = "<group>"; };
 		EB12408828DD78414D418946 /* LogoSwap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoSwap.swift; sourceTree = "<group>"; };
 		ED17296284B474C821364179 /* OPL3Chip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Chip.swift; sourceTree = "<group>"; };
+		ED848A62BEDC228B03CCABC5 /* Troops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Troops.swift; sourceTree = "<group>"; };
 		EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGame.swift; sourceTree = "<group>"; };
 		EF83496DB89C3E7F819D3F67 /* Keyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keyboard.swift; sourceTree = "<group>"; };
 		F3ADA3F49410B233337EF0C7 /* Logo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logo.swift; sourceTree = "<group>"; };
@@ -179,6 +187,7 @@
 				F696A1767CFAFC7A1AF2A257 /* Death.swift */,
 				B05C7231919B69A73A0580F7 /* DesertWalk.swift */,
 				4353B53E70AE12D216242FE5 /* DuneTitle.swift */,
+				A424E2236B26FE1AA258106C /* FlatMap.swift */,
 				159E74011B9FCF456A792355 /* Flight.swift */,
 				A3BD8F93438D063F4396E68C /* Fresk.swift */,
 				966DD802EC142B64CE737FE9 /* Game.swift */,
@@ -187,6 +196,7 @@
 				F3ADA3F49410B233337EF0C7 /* Logo.swift */,
 				EB12408828DD78414D418946 /* LogoSwap.swift */,
 				AFBC989350AA2E4F885CB9E8 /* Main.swift */,
+				C6007AD05E00516F3582EFF3 /* OpenDesert.swift */,
 				1B4E8DACA2FBB8C179ECD664 /* Ornithopter.swift */,
 				54D7F2800E07FF9121E0AAE3 /* Palace.swift */,
 				EAFE284DE31237B53D5FC73A /* Presents.swift */,
@@ -239,7 +249,9 @@
 			children = (
 				DB3B70E87F231AB33831B982 /* Dialogue.swift */,
 				7DBAADC5F5BE640A1807A779 /* GameText.swift */,
+				44D01507F2978E1BE26413C5 /* MapRenderer.swift */,
 				EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */,
+				ED848A62BEDC228B03CCABC5 /* Troops.swift */,
 				41386BC22871F9E97BBE2687 /* World.swift */,
 			);
 			path = World;
@@ -448,6 +460,7 @@
 				182F7C59108908CCD4B28BC2 /* DuneTitle.swift in Sources */,
 				97B9C2334C3C29253EA7EF20 /* Effects.swift in Sources */,
 				8BF55510EC2D3A6ECCB014BD /* Event.swift in Sources */,
+				9A68E05B56A4A12A8832A35A /* FlatMap.swift in Sources */,
 				A824394E8789098F999E6CCC /* Flight.swift in Sources */,
 				33E1C8A25F24C3DF8E13A32D /* Font.swift in Sources */,
 				B071C37828284FF2FE1EFAB9 /* Fresk.swift in Sources */,
@@ -463,6 +476,7 @@
 				C83CBFB37121CE1BF28D70B2 /* Logo.swift in Sources */,
 				77471BEEB95907662E9830B8 /* LogoSwap.swift in Sources */,
 				BA11E6F3247732B411DF7356 /* Main.swift in Sources */,
+				DA70C862F45730BB3B097555 /* MapRenderer.swift in Sources */,
 				BAE2A0525B3ECDC648B81B3B /* Math.swift in Sources */,
 				BC050C6B70287CA6375E8F8E /* Mouse.swift in Sources */,
 				FD89E79697094D65D8D768E2 /* Music.swift in Sources */,
@@ -475,6 +489,7 @@
 				FB4777E517F1790C25B275FA /* OPL3Operator.swift in Sources */,
 				53E840D58AE19F5C216845A5 /* OPL3SignalSource.swift in Sources */,
 				EEC75A45C38262B56CC9F8EF /* OPL3Tables.swift in Sources */,
+				60359D1F877B65E757A575ED /* OpenDesert.swift in Sources */,
 				F3D4FDFA69755ACE02B18F9B /* Ornithopter.swift in Sources */,
 				708231813C1A71796D0CC8F7 /* Palace.swift in Sources */,
 				EBC97612A68445D129BF0E7E /* Palette.swift in Sources */,
@@ -497,6 +512,7 @@
 				FC030C6E0D93E68700834DA5 /* SpriteAnimation.swift in Sources */,
 				0522BA979FCA4060DB96AF49 /* Stars.swift in Sources */,
 				0AF3262F128BADDF4F5BF6ED /* Sunrise.swift in Sources */,
+				C7EDC664102123EB9825EA0B /* Troops.swift in Sources */,
 				0142760B96248516BB095027 /* Types.swift in Sources */,
 				49DF4C3A6ABED5AB8B74DB25 /* UI.swift in Sources */,
 				E47848355E615BE358C6D5D9 /* Video.swift in Sources */,

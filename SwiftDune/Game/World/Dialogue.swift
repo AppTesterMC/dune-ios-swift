@@ -346,6 +346,7 @@ final class Story {
         if newPhase <= 0x6C && newPhase & 3 == 0 {
             let result = world.phaseCallback(newPhase)
             if result.cutscene != 0 { pendingScene = result.cutscene }
+            if result.vision != 0 { world.queueVision(result.vision) }
         }
     }
 
