@@ -9,6 +9,7 @@ import Foundation
 
 final class Game: DuneNode {
     private var mainMenuItems: [UInt16] = [141, 109]
+    private var mainMenuCaptions: [String]? = nil
     // Palace scene records copied from dune-re-ref's palace_rooms table.
     // Exit order is UP, RIGHT, DOWN, LEFT; values 1...12 are destination
     // room ids and values with bit 0x80 are special desert exits.
@@ -90,6 +91,7 @@ final class Game: DuneNode {
       dialogueCharacter = nil
       lastDialogueCharacter = nil
       dialogueMenuItems = []
+      mainMenuCaptions = nil
       dialogueContext = .palace
       dialoguePhraseOverride = nil
       musicStarted = false
@@ -254,6 +256,13 @@ final class Game: DuneNode {
 
 
     private func roomCharacterItems() -> [UInt16] {
+        if currentGameRoom == 8 {
+            // COMMAND1.HSQ does not contain the COMM-room rows; the original
+            // executable supplies these labels from its room command table.
+            // Keep the exact captions here and reserve the numeric ids for
+            // the Swift input dispatcher only.
+            return [0, 1, 2]
+        }
         var items: [UInt16] = [141]
         switch currentGameRoom {
         case 10:
@@ -530,6 +539,24 @@ final class Game: DuneNode {
         setNodeActive("Fresk", true, .foreground)
         (findNode("Fresk") as? Fresk)?.showResults()
     }
+
+    private func showCommunication(mode: Int) {
+        if findNode("Communication") == nil {
+            attachNode(CommunicationOverlay())
+        }
+        if let communication = findNode("Communication") {
+            communication.params = [
+                "mode": mode,
+                // The first Emperor sighting is the exact PHRASE11 branch
+                // used by the original COMM-room message handler.
+                "phraseIndex": 225
+            ]
+        }
+        setNodeActive("Communication", true, .foreground)
+        if mode == 1 && gameState.shipmentArmed {
+            gameState.shipSpiceInCommunicationRoom()
+        }
+    }
     
     
     func showBook() {
@@ -547,6 +574,14 @@ final class Game: DuneNode {
 
 
     override func onKey(_ key: DuneKeyEvent) {
+        if isOverlayActive("Communication") {
+            if key.specialKey == .keyEscape || key.char == " " || key.specialKey == .keyReturn {
+                setNodeActive("Communication", false)
+                publishMainUI()
+            }
+            return
+        }
+
         if isOverlayActive("Dialogue") {
             closeDialogueLine()
             return
@@ -668,6 +703,27 @@ final class Game: DuneNode {
 
 
     override func onClick(_ event: DuneMouseClickEvent) {
+        if isOverlayActive("Communication") {
+            let point = event.point
+            if point.y < 152 {
+                if let communication = findNode("Communication") as? CommunicationOverlay {
+                    if point.y >= 30 && point.y < 68 {
+                        communication.params = ["mode": 1, "phraseIndex": 225]
+                        if gameState.shipmentArmed {
+                            gameState.shipSpiceInCommunicationRoom()
+                        }
+                    } else if point.y >= 68 || point.y < 34 {
+                        setNodeActive("Communication", false)
+                        publishMainUI()
+                    }
+                }
+            } else {
+                setNodeActive("Communication", false)
+                publishMainUI()
+            }
+            return
+        }
+
         if isOverlayActive("Dialogue") {
             closeDialogueLine()
             return
@@ -796,6 +852,12 @@ final class Game: DuneNode {
         }
 
         switch mainMenuItems[index] {
+        case 0 where currentGameRoom == 8:
+            showCommunication(mode: 0)
+        case 1 where currentGameRoom == 8:
+            showCommunication(mode: 1)
+        case 2 where currentGameRoom == 8:
+            publishMainUI()
         case 141:
             showFresk()
         case 109, 110, 111, 112, 113, 114, 115, 116, 117, 124, 132:
@@ -942,6 +1004,9 @@ final class Game: DuneNode {
 
     private func publishMainUI() {
         mainMenuItems = roomCharacterItems()
+        mainMenuCaptions = currentGameRoom == 8
+            ? ["VIEW NEW MESSAGES", "MESSAGES ALREADY SEEN", "CANCEL"]
+            : nil
         let directions = roomDirections()
 
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
@@ -950,7 +1015,8 @@ final class Game: DuneNode {
             items: mainMenuItems,
             directions: directions,
             day: gameState.day,
-            phase: gameState.phase
+            phase: gameState.phase,
+            captions: mainMenuCaptions
         ))
     }
 

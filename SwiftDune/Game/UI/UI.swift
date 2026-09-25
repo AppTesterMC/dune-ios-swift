@@ -47,6 +47,7 @@ final class UI: DuneNode {
     // disabled before the room graph has been queried.
     private var directions: UIDirection = .all
     private var menuItems: [UInt16] = []
+    private var menuCaptions: [String]? = nil
     private var dayNumber = 1
     private var phase: GamePhase = .dawn
     
@@ -94,11 +95,6 @@ final class UI: DuneNode {
             return
         }
 
-        // Palace scenery and character sprites update the shared palette while
-        // rendering. Restore the UI palette before drawing the panel and its
-        // command text so the playable controls retain their intended colors.
-        uiSprite.setPalette()
-                
         // Block
         uiSprite.drawFrame(15, x: 126, y: 148, buffer: buffer)
         uiSprite.drawFrame(14, x: 92, y: 152, buffer: buffer)
@@ -221,7 +217,9 @@ final class UI: DuneNode {
             }
 
             if i < menuItems.count {
-                let sentence = commands.sentence(at: menuItems[i])
+                let sentence = menuCaptions?.indices.contains(i) == true
+                    ? menuCaptions![i]
+                    : commands.sentence(at: menuItems[i])
                 font.paletteIndex = i == selectedMenuIndex ? darkColorIndex : lightColorIndex
                 font.render(sentence, rect: menuItemTextRect, buffer: buffer, style: .small)
             }
@@ -233,6 +231,7 @@ final class UI: DuneNode {
     
     func onUIEvent(_ e: UIStateEventData) {
         self.menuItems = e.items
+        self.menuCaptions = e.captions
         self.leftPanel = e.leftPanel
         self.rightPanel = e.rightPanel
         self.directions = e.directions
@@ -249,6 +248,7 @@ struct UIStateEventData {
     var directions: UIDirection = .all
     var day: Int = 1
     var phase: GamePhase = .dawn
+    var captions: [String]? = nil
 }
 
 

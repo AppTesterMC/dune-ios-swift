@@ -281,6 +281,9 @@ final class GameState {
     private(set) var shipmentOfferAmounts: [UInt16] = []
     private(set) var shipmentPending = false
     private(set) var shipmentDaysRemaining: Int = 0
+    private(set) var shipmentAgreedAmount: UInt16 = 0
+    private(set) var shipmentArmed = false
+    private var shipmentArguingCounter: UInt8 = 0
     private var shipmentSequence: UInt8 = 0
     private var randomSeed: UInt16 = 0
 
@@ -321,6 +324,9 @@ final class GameState {
         shipmentOfferAmounts = []
         shipmentPending = false
         shipmentDaysRemaining = 0
+        shipmentAgreedAmount = 0
+        shipmentArmed = false
+        shipmentArguingCounter = 0
         shipmentSequence = 0
         // The original seeds this LCG from the BIOS timer.  The algorithm is
         // exact; a fixed seed keeps regression captures deterministic.
@@ -417,9 +423,12 @@ final class GameState {
             quantity = UInt16((base * random) >> 8)
         }
         shipmentDemand = quantity
-        shipmentOfferAmounts = [quantity, quantity / 2, quantity / 4]
+        stageDuncanOffers(for: quantity, stock: spiceStock)
         shipmentPending = true
         shipmentDaysRemaining = 4
+        shipmentAgreedAmount = 0
+        shipmentArmed = false
+        shipmentArguingCounter = 0
         milestone = .shipmentRequested
         lastAction = "EMPEROR DEMANDS \(quantity * 10) KGS"
     }
@@ -445,24 +454,31 @@ final class GameState {
     }
 
     func acceptSpiceShipment(option: Int = 0) {
-        guard shipmentPending, shipmentOfferAmounts.indices.contains(option) else { return }
-        let amount = shipmentOfferAmounts[option]
-        spiceStock = spiceStock > amount ? spiceStock - amount : 0
-        shipmentPending = false
-        shipmentDemand = 0
-        shipmentDaysRemaining = 0
-        shipmentOfferAmounts = []
+        guard shipmentPending, !shipmentOfferAmounts.isEmpty else { return }
+        // The DOS event increments the bargaining counter before ACCEPT and
+        // chooses (counter - 1) & 3.  `option` remains as a compatibility
+        // escape hatch for scripted tests, but normal play follows the exact
+        // conversation counter.
+        let selected = option == 0 ? Int(shipmentArguingCounter) & 3 : option & 3
+        guard shipmentOfferAmounts.indices.contains(selected) else { return }
+        shipmentAgreedAmount = shipmentOfferAmounts[selected]
+        shipmentArmed = true
+        shipmentArguingCounter &+= 1
         milestone = .shipmentAccepted
-        lastAction = "SHIP (amount * 10) KGS TO EMPEROR"
+        lastAction = "AGREED (shipmentAgreedAmount * 10) KGS; GO TO COMM ROOM"
     }
 
     /// Port of dune-re's `stage_spice_argue_amounts_with_duncan`. The DOS
     /// routine stages four stock/demand brackets; the later dialogue event
     /// selects one of those entries when Paul accepts the negotiated offer.
     func argueSpiceShipment() {
-        guard shipmentPending else { return }
-        let demand = shipmentDemand
-        let stock = spiceStock
+        guard shipmentPending, !shipmentArmed else { return }
+        shipmentArguingCounter &+= 1
+        lastAction = "ARGUE SHIPMENT AMOUNTS"
+    }
+
+    /// The exact `duncanOffers` bracket from story.cpp/sub_122b1.
+    private func stageDuncanOffers(for demand: UInt16, stock: UInt16) {
         let oneAndHalfDemand = demand &+ (demand >> 1)
         let doubleDemand = demand &* 2
         let halfStock = stock >> 1
@@ -479,12 +495,26 @@ final class GameState {
         } else {
             shipmentOfferAmounts = [demand, stock, oneAndHalfDemand, doubleDemand]
         }
-        lastAction = "ARGUE SHIPMENT AMOUNTS"
+    }
+
+    /// The original does not ship in Duncan's dialogue.  It arms the amount;
+    /// the actual subtraction and fulfilment calculation happen in COMM.
+    func shipSpiceInCommunicationRoom() {
+        guard shipmentArmed else { return }
+        let amount = min(shipmentAgreedAmount, spiceStock)
+        spiceStock &-= amount
+        shipmentPending = false
+        shipmentDemand = 0
+        shipmentDaysRemaining = 0
+        shipmentOfferAmounts = []
+        shipmentAgreedAmount = 0
+        shipmentArmed = false
+        milestone = .shipmentAccepted
+        lastAction = "SHIPPED (amount * 10) KGS TO EMPEROR"
     }
 
     func refuseSpiceShipment() {
         guard shipmentPending else { return }
-        shipmentPending = false
         lastAction = "SPICE SHIPMENT REFUSED"
     }
 

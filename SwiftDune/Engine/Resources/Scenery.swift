@@ -146,7 +146,10 @@ final class Scenery {
                 RoomSpriteIndices("EQUI.HSQ", 8, 9),
                 RoomSpriteIndices("BALCON.HSQ", 10, 11),
                 RoomSpriteIndices("CORR.HSQ", 12, 13),
-                RoomSpriteIndices("SERRE.HSQ", 14, 14),
+                // The floppy scene table selects PALPLAN.HSQ for SAL room
+                // 14 (background byte 0xCF). SERRE is the greenhouse
+                // resource and corrupts this palace room when used here.
+                RoomSpriteIndices("PALPLAN.HSQ", 14, 14),
             ]
         }
 
@@ -275,6 +278,11 @@ final class Scenery {
     
     
     func drawRoom(_ index: Int, buffer: PixelBuffer) {
+        guard index >= 0 && index < rooms.count else {
+            engine.logger.log(.error, "drawRoom(): invalid room index \(index) / \(rooms.count)")
+            return
+        }
+
         let room = rooms[index]
         
         var i = 0

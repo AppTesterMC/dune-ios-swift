@@ -311,6 +311,7 @@ final class ResourceStream {
     func readByte(peek: Bool = false) -> UInt8 {
         if offset >= size {
             print("Trying to read offset \(offset) with size \(size)")
+            return 0
         }
         
         let b0 = data[Int(offset)]
@@ -691,4 +692,3 @@ extension FileHandle {
         }
     }
 }
-

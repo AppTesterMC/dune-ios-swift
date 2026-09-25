@@ -46,17 +46,17 @@ final class GameFont {
         self.charWidths = resource.stream!.readBytes(256)
     }
 
-    /// Convert a Swift character to an index in the original 8-bit DOS font.
+    /// Convert a Swift character to an index in the original DOS font.
     ///
     /// The command text is decoded from the game's ISO-8859-1 data, but Swift
     /// strings can contain Unicode scalars which do not have a corresponding
-    /// glyph in DUNECHAR.HSQ.  Never let those values escape into the font
-    /// tables: results text must be able to render even when it contains an
-    /// accented or otherwise extended character.
+    /// glyph in DUNECHAR.HSQ.  The resource has 128 glyphs per font size,
+    /// even though its width table has 256 entries. Never let an extended
+    /// value escape into the glyph data: story text must remain renderable.
     private func characterIndex(_ character: Swift.Character) -> Int {
         guard let scalar = String(character).unicodeScalars.first,
-              scalar.value <= 255 else {
-            return charWidths.indices.contains(63) ? 63 : 0
+              scalar.value < 128 else {
+            return charWidths.indices.contains(63) ? 63 : 0 // '?'
         }
 
         let index = Int(scalar.value)

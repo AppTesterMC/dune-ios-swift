@@ -201,9 +201,12 @@ final class Palace: DuneNode {
         // the Swift shared palette deterministic as well: opening the globe
         // or book must not leave its palette behind when the cached room is
         // shown again.
-        palaceScenery.setPalette(roomIndex)
         palaceScenery.setSharedPalette()
         palaceScenery.setCharacterPalette()
+        // DOS opens PERS.HSQ while drawing standing characters, then
+        // re-applies the active room sheet. Keep the room palette last so
+        // EQUI/BALCON/CORR rooms do not inherit colours from another room.
+        palaceScenery.setPalette(roomIndex)
         // The sky is indexed data, so it must be the final palette writer for
         // the exterior background. BALCON.HSQ has its own alternate palette;
         // applying it after SKY.HSQ turns the blue sky into the purple/green
