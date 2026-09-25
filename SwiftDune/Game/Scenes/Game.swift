@@ -10,33 +10,15 @@ import Foundation
 final class Game: DuneNode {
     private var mainMenuItems: [UInt16] = [141, 109]
     private var mainMenuCaptions: [String]? = nil
-    // Palace scene records copied from dune-re-ref's palace_rooms table.
-    // Exit order is UP, RIGHT, DOWN, LEFT; values 1...12 are destination
-    // room ids and values with bit 0x80 are special desert exits.
-    private let palaceRoomExits: [[UInt8]] = [
-        [0, 0, 0, 0],
-        [0x02, 0x00, 0xfd, 0x00],
-        [0x07, 0x00, 0x01, 0x8c],
-        [0x00, 0x00, 0x00, 0x0b],
-        [0x0a, 0x00, 0x07, 0x00],
-        [0x00, 0x00, 0x00, 0x0a],
-        [0x0b, 0x00, 0x00, 0x00],
-        [0x04, 0x8b, 0x02, 0x88],
-        [0x00, 0x87, 0x0c, 0x00],
-        [0x00, 0x00, 0x0a, 0x00],
-        [0x09, 0x05, 0x04, 0x00],
-        [0x00, 0x83, 0x06, 0x07],
-        [0x08, 0x02, 0x00, 0x00]
-    ]
+    // Paul's position, exits, sheets and who stands where come from the
+    // executable's data segment (World), not from hand-copied tables.
+    private let world = World.shared
 
-    // Scene-record background bytes map to PALACE.SAL sub-chunks:
-    // room 1 -> BALCON 11, room 2 -> EQUI 9, ..., room 10 -> POR 0.
-    private let palaceRoomSALIndices: [Int] = [
-        0, 11, 9, 14, 1, 10, 4, 12, 5, 2, 0, 3, 13
-    ]
-
-    private var currentGameRoom = 10 // DOS starts at 0x200A, the throne room.
-    private var currentMarkers: [Int: RoomCharacter] = [0: .leto]
+    /// Room number (1-based) of the current place, ds:4.
+    private var currentGameRoom: Int {
+        get { world.room }
+        set { world.setRoom(newValue) }
+    }
     private var dialogueCharacter: DuneCharacter?
     private var lastDialogueCharacter: DuneCharacter?
     private var dialogueMenuItems: [UInt16] = []
@@ -49,17 +31,6 @@ final class Game: DuneNode {
         case troop
         case shipment
     }
-    // The first two playable palace speakers are backed by the same marker
-    // slots used by the extracted palace scene records.  Empty rooms remain
-    // empty until their character records are decoded.
-    private let palaceRoomMarkers: [Int: [Int: RoomCharacter]] = [
-        10: [0: .leto],
-        4: [7: .jessica]
-    ]
-    private let palaceRoomSpeakers: [Int: DuneCharacter] = [
-        10: .leto,
-        4: .jessica
-    ]
     private let menuRect = DuneRect(92, 159, 136, 40)
     // Exact English COMMAND1.HSQ records used by the original command menus.
     private let sietchOrderItems: [UInt16] = [67, 68, 69, 70, 71]
@@ -86,8 +57,7 @@ final class Game: DuneNode {
   
     override func onEnable() {
       engine.palette.clear()
-      currentGameRoom = 10
-      currentMarkers = [0: .leto] // person 0, first marker in throne-room SAL 0
+      world.reset() // new game: the executable's data, Paul in the throne room
       dialogueCharacter = nil
       lastDialogueCharacter = nil
       dialogueMenuItems = []
@@ -112,13 +82,18 @@ final class Game: DuneNode {
             musicStarted = true
         }
 
-        let salIndex = palaceRoomSALIndices[currentGameRoom]
+        guard let record = world.currentRoomRecord() else {
+            engine.logger.log(.error, "showRoom(): no room \(currentGameRoom) for place type \(world.placeType)")
+            return
+        }
+        let salIndex = record.salRoom
         let roomPresentation = PalaceRoom(rawValue: salIndex) ?? .porch
         let roomParams: [String: Any] = [
             "room": roomPresentation,
             "salRoom": salIndex,
             "gameRoomID": currentGameRoom,
-            "markers": currentMarkers
+            "sheet": world.sheet(for: record),
+            "people": world.peopleInRoom()
         ]
         var params = roomParams
         if let dialogueCharacter = dialogueCharacter {
@@ -263,18 +238,11 @@ final class Game: DuneNode {
             // the Swift input dispatcher only.
             return [0, 1, 2]
         }
+        // SEE DUNE MAP, then one row per person in the room: COMMAND 109 +
+        // character number (109 Leto ... 117 Harah).
         var items: [UInt16] = [141]
-        switch currentGameRoom {
-        case 10:
-            items.append(109) // Duke Leto
-            if gameState.storyPhase >= 0x01 { items.append(113) } // Gurney
-        case 4:
-            items.append(110) // Jessica
-            if gameState.storyPhase >= 0x01 { items.append(112) } // Duncan
-        case 8:
-            items.append(111) // Thufir
-        default:
-            break
+        for person in world.peopleInRoom() where person <= World.harah {
+            items.append(UInt16(109 + person))
         }
         return Array(items.prefix(5))
     }
@@ -491,11 +459,18 @@ final class Game: DuneNode {
 
     private func roomDirections() -> UIDirection {
         var directions: UIDirection = []
-        let exits = palaceRoomExits[currentGameRoom]
-        if exits[0] != 0 { directions.insert(.up) }
-        if exits[1] != 0 { directions.insert(.right) }
-        if exits[2] != 0 { directions.insert(.down) }
-        if exits[3] != 0 { directions.insert(.left) }
+        guard let exits = world.currentRoomRecord()?.exits else { return directions }
+        // Locked doors (bit 7) show no arrow until the story opens them.
+        func usable(_ value: UInt8) -> Bool {
+            switch RoomRecord.decode(value) {
+            case .room, .leave: return true
+            case .none, .locked, .unknown: return false
+            }
+        }
+        if usable(exits[0]) { directions.insert(.up) }
+        if usable(exits[1]) { directions.insert(.right) }
+        if usable(exits[2]) { directions.insert(.down) }
+        if usable(exits[3]) { directions.insert(.left) }
         return directions
     }
 
@@ -865,9 +840,7 @@ final class Game: DuneNode {
             // 0x0180. In PALACE.SAL room 0 that is marker 0, not intro
             // marker 8. Selecting his command returns to that room with the
             // correct person slot populated.
-            let speaker = character(forCommandItem: mainMenuItems[index])
-                ?? palaceRoomSpeakers[currentGameRoom]
-            guard let speaker = speaker else { return }
+            guard let speaker = character(forCommandItem: mainMenuItems[index]) else { return }
             beginDialogue(with: speaker, context: .palace)
         case 214:
             showBook()
@@ -1031,20 +1004,20 @@ final class Game: DuneNode {
 
     private func moveRoom(_ direction: RoomDirection) {
         dialogueCharacter = nil
-        let exit = palaceRoomExits[currentGameRoom][direction.rawValue]
-        guard exit != 0 else {
-            return
-        }
+        guard let exits = world.currentRoomRecord()?.exits else { return }
 
-        if exit & 0x80 != 0 {
-            showDesert(destinationCode: Int(exit & 0x7f))
-            return
+        switch RoomRecord.decode(exits[direction.rawValue]) {
+        case .room(let room):
+            currentGameRoom = room
+            showRoom()
+            publishMainUI()
+        case .leave:
+            // 252-254 leave the place. The original opens the flat map to
+            // choose a destination; until the map is ported this keeps the
+            // existing desert flight (to Carthag-Tuek, location 12).
+            showDesert(destinationCode: 12)
+        case .none, .locked, .unknown:
+            break
         }
-
-        guard exit < palaceRoomExits.count else { return }
-        currentGameRoom = Int(exit)
-        currentMarkers = palaceRoomMarkers[currentGameRoom] ?? [:]
-        showRoom()
-        publishMainUI()
     }
 }

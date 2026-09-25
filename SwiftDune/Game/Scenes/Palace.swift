@@ -36,6 +36,10 @@ final class Palace: DuneNode {
     private var gameRoomID: Int?
     private var salRoomIndex: Int?
     private var markers: Dictionary<Int, RoomCharacter> = [:]
+    /// Sheet from the room code (World.sheet(for:)); nil = legacy ranges.
+    private var sheet: String?
+    /// Character numbers in the room; placed with World.markerAssignment.
+    private var people: [Int]?
     private var character: DuneCharacter = .none
     private var zoomRect: DuneRect?
     private var dayMode: DuneLightMode = .day
@@ -53,7 +57,20 @@ final class Palace: DuneNode {
         sky = Sky()
         
         engine.palette.clear()
+        palaceScenery?.sheetOverride = sheet
+        applyPeople()
         palaceScenery?.characters = markers
+    }
+
+
+    /// Puts `people` on the current room's markers the way the original
+    /// does (last marker first, see World.markerAssignment).
+    private func applyPeople() {
+        guard let people = people, let scenery = palaceScenery, let sal = salRoomIndex,
+              sal >= 0 && sal < scenery.rooms.count else { return }
+        let assignment = World.shared.markerAssignment(people: people, markers: scenery.rooms[sal].markerCount)
+        markers = assignment.compactMapValues { RoomCharacter(rawValue: World.persFrame($0)) }
+        scenery.characters = markers
     }
     
     
@@ -63,6 +80,8 @@ final class Palace: DuneNode {
         characterSprite = nil
         
         markers = [:]
+        sheet = nil
+        people = nil
         character = .none
         currentRoom = .stairs
         gameRoomID = nil
@@ -93,6 +112,16 @@ final class Palace: DuneNode {
         if let markers = params["markers"] {
             self.markers = markers as! Dictionary<Int, RoomCharacter>
             palaceScenery?.characters = self.markers
+        }
+
+        if params.keys.contains("sheet") {
+            self.sheet = params["sheet"] as? String
+            palaceScenery?.sheetOverride = self.sheet
+        }
+
+        if let people = params["people"] as? [Int] {
+            self.people = people
+            applyPeople()
         }
 
         if let duration = params["duration"] {

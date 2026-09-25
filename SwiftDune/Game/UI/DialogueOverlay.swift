@@ -56,7 +56,7 @@ final class DialogueOverlay: DuneNode {
             font.render(speaker, rect: DuneRect(6, 134, 90, 8), buffer: buffer,
                         alignment: .left, style: .small)
         }
-        font.render(phrases.sentence(at: phraseIndex, printableOnly: true),
+        font.render(GameText.shared.phrase(Int(phraseIndex)).replacingOccurrences(of: "\u{FE}", with: " "),
                     rect: DuneRect(6, 143, 308, 21), buffer: buffer,
                     alignment: .left, style: .small)
     }
@@ -110,7 +110,7 @@ final class CommunicationOverlay: DuneNode {
         } else {
             font.render("EMPEROR SHADDAM IV", rect: DuneRect(8, 34, 304, 10),
                         buffer: buffer, alignment: .center, style: .small)
-            font.render(phrases.sentence(at: phraseIndex, printableOnly: true),
+            font.render(GameText.shared.phrase(Int(phraseIndex)).replacingOccurrences(of: "\u{FE}", with: " "),
                         rect: DuneRect(12, 56, 296, 36), buffer: buffer,
                         alignment: .justify, style: .small)
             font.render("CLICK TO RETURN", rect: DuneRect(8, 116, 304, 10),

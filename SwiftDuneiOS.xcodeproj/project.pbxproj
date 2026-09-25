@@ -64,6 +64,7 @@
 		D51758ECDCC4E603F5F5AC28 /* Character.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85DE6529940F5D8FA35FE98 /* Character.swift */; };
 		D601D790748A1DFFFD88A57E /* WormCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24791A4FCCB8FADF4A51268 /* WormCall.swift */; };
 		D9A79D17D6859E08AE065BD2 /* Sprite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 850C3BC698B9935363B2F854 /* Sprite.swift */; };
+		DAC6ED537D3DAF0FC52C054B /* GameText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DBAADC5F5BE640A1807A779 /* GameText.swift */; };
 		DE612A14F34FD75944036DE1 /* Queue.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7011AB9CAABA72B0283D919 /* Queue.swift */; };
 		E3F33E84AC532A68E0F8ADCF /* PixelBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614A6BFE79A0D88DF3EC7C6A /* PixelBuffer.swift */; };
 		E47848355E615BE358C6D5D9 /* Video.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83B000A1E76930997D01267 /* Video.swift */; };
@@ -74,6 +75,7 @@
 		EDB0E21F10731B3DCCD3BAB6 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DE695E2251829A5FE77B2B1 /* Book.swift */; };
 		EEAA8E87911707CF20B56A4D /* OPL3Fm.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10D85774F728953110491F1 /* OPL3Fm.swift */; };
 		EEC75A45C38262B56CC9F8EF /* OPL3Tables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2879BC83E156C3D5F7EEF849 /* OPL3Tables.swift */; };
+		F22A9CFEE9CF127DA51AB79E /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41386BC22871F9E97BBE2687 /* World.swift */; };
 		F3D4FDFA69755ACE02B18F9B /* Ornithopter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4E8DACA2FBB8C179ECD664 /* Ornithopter.swift */; };
 		FB4777E517F1790C25B275FA /* OPL3Operator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 495E8D1A298936E97E9357AA /* OPL3Operator.swift */; };
 		FC030C6E0D93E68700834DA5 /* SpriteAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3B911A28F0BBD8BF4D86BA /* SpriteAnimation.swift */; };
@@ -98,6 +100,7 @@
 		2E43ACB358B4D725E8CBF867 /* Sound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sound.swift; sourceTree = "<group>"; };
 		3A4E2ED11BE872387055ADC9 /* DevHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevHarness.swift; sourceTree = "<group>"; };
 		3E387EDA4831F07D1922BFA7 /* DuneIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneIOSApp.swift; sourceTree = "<group>"; };
+		41386BC22871F9E97BBE2687 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
 		4353B53E70AE12D216242FE5 /* DuneTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneTitle.swift; sourceTree = "<group>"; };
 		473FB8092A872F8EE45E771B /* Palette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palette.swift; sourceTree = "<group>"; };
 		495E8D1A298936E97E9357AA /* OPL3Operator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Operator.swift; sourceTree = "<group>"; };
@@ -114,6 +117,7 @@
 		7B0C71306981EBCB8273987E /* Prologue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prologue.swift; sourceTree = "<group>"; };
 		7C29FD2E9E41E5486D49300E /* GameTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameTypes.swift; sourceTree = "<group>"; };
 		7D3B911A28F0BBD8BF4D86BA /* SpriteAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteAnimation.swift; sourceTree = "<group>"; };
+		7DBAADC5F5BE640A1807A779 /* GameText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameText.swift; sourceTree = "<group>"; };
 		7DE695E2251829A5FE77B2B1 /* Book.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Book.swift; sourceTree = "<group>"; };
 		83DD925F6430920C677E3609 /* Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Types.swift; sourceTree = "<group>"; };
 		850C3BC698B9935363B2F854 /* Sprite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sprite.swift; sourceTree = "<group>"; };
@@ -220,9 +224,19 @@
 				7C29FD2E9E41E5486D49300E /* GameTypes.swift */,
 				00750E6EFB405ECFADA8A178 /* Scenes */,
 				1862E67DF0EE53A9BB0BFB20 /* UI */,
+				61A6779596F83CC88DC80D0B /* World */,
 			);
 			name = Game;
 			path = SwiftDune/Game;
+			sourceTree = "<group>";
+		};
+		61A6779596F83CC88DC80D0B /* World */ = {
+			isa = PBXGroup;
+			children = (
+				7DBAADC5F5BE640A1807A779 /* GameText.swift */,
+				41386BC22871F9E97BBE2687 /* World.swift */,
+			);
+			path = World;
 			sourceTree = "<group>";
 		};
 		67CB7C9C2E9C5AF40A39088D /* iOS */ = {
@@ -431,6 +445,7 @@
 				33E1C8A25F24C3DF8E13A32D /* Font.swift in Sources */,
 				B071C37828284FF2FE1EFAB9 /* Fresk.swift in Sources */,
 				6EA9FD66C72FC129D5B16E7D /* Game.swift in Sources */,
+				DAC6ED537D3DAF0FC52C054B /* GameText.swift in Sources */,
 				CE597F6D582912E8087FBB67 /* GameTypes.swift in Sources */,
 				A832F3C769ABDE450DC0D194 /* Globe.swift in Sources */,
 				32730A4E9B86C28AE672FD4F /* HERAD.swift in Sources */,
@@ -477,6 +492,7 @@
 				0142760B96248516BB095027 /* Types.swift in Sources */,
 				49DF4C3A6ABED5AB8B74DB25 /* UI.swift in Sources */,
 				E47848355E615BE358C6D5D9 /* Video.swift in Sources */,
+				F22A9CFEE9CF127DA51AB79E /* World.swift in Sources */,
 				D601D790748A1DFFFD88A57E /* WormCall.swift in Sources */,
 				2B133FF15B4BEB7322FF943D /* WormRide.swift in Sources */,
 			);

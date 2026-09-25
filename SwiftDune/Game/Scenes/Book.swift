@@ -173,7 +173,7 @@ final class Book: DuneNode {
             }
             font.render(heading, rect: DuneRect(32, 8, 256, 12), buffer: contextBuffer, alignment: .center, style: .small)
 
-            let text = phraseBank.sentence(at: 30, printableOnly: true)
+            let text = GameText.shared.phrase(30).replacingOccurrences(of: "\u{FE}", with: " ")
             font.render(text, rect: DuneRect(28, 30, 264, 82), buffer: contextBuffer, alignment: .left, style: .small)
             font.render("PAGE 1", rect: DuneRect(270, 134, 36, 10), buffer: contextBuffer, alignment: .center, style: .small)
         }

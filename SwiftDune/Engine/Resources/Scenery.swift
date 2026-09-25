@@ -96,6 +96,8 @@ struct RoomSpriteIndices {
 
 struct Room {
     var offset: UInt32 = 0
+    /// First byte of the room: how many position markers it has.
+    var markerCount: Int = 0
     var commands: [RoomCommandProtocol] = []
 }
 
@@ -117,6 +119,18 @@ final class Scenery {
     }
     
     var characters: Dictionary<Int, RoomCharacter> = [:]
+
+    /// Sheet chosen by the room code's slot (World.sheet(for:)). When set it
+    /// replaces the per-file index ranges below, which are only a guess
+    /// kept for the intro scenes.
+    var sheetOverride: String? {
+        didSet {
+            if let name = sheetOverride, sheetCache[name] == nil {
+                sheetCache[name] = Sprite(name)
+            }
+        }
+    }
+    private var sheetCache: [String: Sprite] = [:]
 
     init(_ fileName: String) {
         self.resource = Resource(fileName)
@@ -167,7 +181,7 @@ final class Scenery {
 
         while i < roomCount {
             var room = Room(offset: resource.stream!.offset)
-            let _ = resource.stream!.readByte() // Room marker count
+            room.markerCount = Int(resource.stream!.readByte())
             var markerIndex = 0
             
             /*engine.logger.log(.debug, "--------------------------------------------------------------------------------------")
@@ -273,7 +287,7 @@ final class Scenery {
     // Some room sheets (notably BALCON.HSQ) intentionally omit the shared
     // command-panel palette. POR.HSQ carries that common block.
     func setSharedPalette() {
-        sprite(at: 0)?.setPalette()
+        spriteIndices.first?.sprite.setPalette()
     }
     
     
@@ -342,6 +356,9 @@ final class Scenery {
     
     
     private func sprite(at index: Int) -> Sprite? {
+        if let name = sheetOverride, let sprite = sheetCache[name] {
+            return sprite
+        }
         for s in spriteIndices {
             if index >= s.indexStart && index <= s.indexEnd {
                 return s.sprite

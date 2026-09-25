@@ -306,10 +306,11 @@ final class GameState {
 
     func reset() {
         elapsedTime = 0.0
-        gameTicks = 0
-        gameHour = 0
-        sunlightDay = 0
-        day = 1
+        // ds:2 starts at 2 in both executables (checked in the data segment).
+        gameTicks = World.shared.w(World.gameTime)
+        gameHour = Int(gameTicks & 0x000F)
+        sunlightDay = Int((UInt32(gameTicks) + UInt32(OriginalGameData.sunlightDayOffset)) >> 4)
+        day = World.shared.day
         phase = .dawn
         troopOrder = .hold
         troopOccupation = .none
@@ -350,8 +351,10 @@ final class GameState {
             gameTicks &+= 1
         }
 
+        World.shared.setW(World.gameTime, gameTicks)
         gameHour = Int(gameTicks & 0x000F)
-        day = Int(gameTicks / UInt16(OriginalGameData.gameHoursPerDay)) + 1
+        // GetSunlightDay (CS1:1AD1): ((t + 3) >> 4), shown modulo 365, 1-based.
+        day = World.shared.day
         sunlightDay = Int((UInt32(gameTicks) + UInt32(OriginalGameData.sunlightDayOffset)) >> 4)
 
         // The executable exposes a 0...15 game hour.  The Swift UI keeps a
@@ -395,6 +398,13 @@ final class GameState {
 
     func advanceStory(to phase: UInt8, action: String) {
         storyPhase = max(storyPhase, phase)
+        let world = World.shared
+        world.setPhase(storyPhase)
+        // Stand-in until the DIALOGUE.HSQ actions are ported: in the original
+        // Duncan reaches palace room 4 through Leto's phase-1 conversation.
+        if storyPhase >= 0x01 && world.character(World.duncan).locationPlusOne == 0xFF {
+            world.moveCharacter(World.duncan, room: 4, location: 0)
+        }
         lastAction = action
         if phase >= 0x01 && milestone == .meetDuke {
             milestone = .findGurney
@@ -404,6 +414,7 @@ final class GameState {
     func findProspectors() {
         prospectorFound = true
         storyPhase = max(storyPhase, 0x05)
+        World.shared.setPhase(storyPhase)
         milestone = .prospectorsFound
         lastAction = "PROSPECTOR AT CARTHAG-TIMIN"
     }

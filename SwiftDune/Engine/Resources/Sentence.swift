@@ -42,6 +42,24 @@ final class Sentence {
     }
     
     
+    /// The raw bytes of a sentence up to (not including) the 0xFF end.
+    func rawBytes(at index: UInt16) -> [UInt8] {
+        guard UInt32(index) < UInt32(sentenceCount()) else { return [] }
+        resource.stream!.seek(UInt32(index) * 2)
+        let start = resource.stream!.readUInt16LE()
+        resource.stream!.seek(UInt32(start))
+        var bytes: [UInt8] = []
+        while !resource.stream!.isEOF() {
+            let current = resource.stream!.readByte()
+            if current == 0xFF { break }
+            bytes.append(current)
+        }
+        return bytes
+    }
+
+
+    /// `printableOnly` drops carriage returns. It used to drop 0x2E as well,
+    /// which removed every full stop from the dialogue.
     func sentence(at index: UInt16, printableOnly: Bool = false) -> String {
         resource.stream!.seek(UInt32(index) * 2)
 
@@ -54,7 +72,7 @@ final class Sentence {
         while true {
             current = resource.stream!.readByte()
             
-            if (current == 0x2E || current == 0x0D) && printableOnly {
+            if current == 0x0D && printableOnly {
                 continue
             }
             
