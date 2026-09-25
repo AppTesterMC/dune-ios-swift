@@ -16,12 +16,18 @@ enum FreskMenuAction {
     case handled
     case close
     case quit
+    /// A save was loaded: show wherever it puts Paul.
+    case loaded
+    case restart
 }
 
 private enum FreskMenuMode {
     case globe
     case results
     case quitConfirmation
+    case save
+    case load
+    case options
 }
 
 final class Fresk: DuneNode {
@@ -109,13 +115,39 @@ final class Fresk: DuneNode {
     }
 
 
+    /// Save/load rows: COMMAND 258-261 ("Log 1: DAY  0 / 12.00 a.m.", ...)
+    /// with the slot's day and the period's label from COMMAND 266 (sixteen
+    /// 10-character labels), then EXIT GLOBE.
+    private var slotCaptions: [String] {
+        let labels = GameText.shared.command(266)
+        var captions: [String] = []
+        for slot in 0..<4 {
+            var caption = GameText.shared.command(258 + slot)
+            if slot < 2, let time = SaveGame.shared.slotTime(slot) {
+                let period = Int(time & 15)
+                let start = labels.index(labels.startIndex, offsetBy: min(10 * period, max(0, labels.count - 10)))
+                let label = labels.count >= 10 ? String(labels[start...].prefix(10)).trimmingCharacters(in: .whitespaces) : ""
+                caption = "Log \(slot + 1): DAY \(String(format: "%2d", time >> 4)) / \(label)"
+            } else if SaveGame.shared.slotTime(slot) == nil {
+                caption += " -"
+            }
+            captions.append(caption)
+        }
+        captions.append(statusCaption ?? GameText.shared.command(170))
+        return captions
+    }
+    private var statusCaption: String?
+
+
     private func publishMenuState() {
+        let saving = menuMode == .save || menuMode == .load
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .globe,
             rightPanel: .rect,
             items: menuItems,
             day: GameState.shared.day,
-            phase: GameState.shared.phase
+            phase: GameState.shared.phase,
+            captions: saving ? slotCaptions : nil
         ))
     }
 
@@ -156,6 +188,11 @@ final class Fresk: DuneNode {
             return menuItemsStats
         case .quitConfirmation:
             return [171, 172]
+        case .save, .load:
+            return [258, 259, 260, 261, 170]
+        case .options:
+            // MUSIC OFF / MUSIC ON (GAME RELATIVE), RESTART, EXIT GAME, EXIT GLOBE
+            return [engine.audioPlayer.musicMuted ? 254 : 257, 173, 174, 170]
         }
     }
 
@@ -185,7 +222,6 @@ final class Fresk: DuneNode {
         font.render(commands.sentence(at: 189), rect: DuneRect(58, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
         font.render(commands.sentence(at: 190), rect: DuneRect(166, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
         font.render(commands.sentence(at: 191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 192), rect: DuneRect(28, 124, 264, 20), buffer: buffer, alignment: .center, style: .small)
 
         // Keep the source command strings above, but expose the live state
         // that the original results screen is driven by. This is intentionally
@@ -245,36 +281,41 @@ final class Fresk: DuneNode {
         }
 
         let index = Int((point.y - 159) / 8)
+        func show(_ mode: FreskMenuMode) -> FreskMenuAction {
+            menuMode = mode
+            statusCaption = nil
+            publishMenuState()
+            return .handled
+        }
         switch menuMode {
-        case .globe:
+        case .globe, .results:
             switch index {
-            case 0:
-                return .close
-            case 1:
-                menuMode = .results
-                publishMenuState()
-                return .handled
-            case 4:
-                menuMode = .quitConfirmation
-                publishMenuState()
-                return .handled
-            default:
-                return .handled
+            case 0: return .close
+            case 1: return show(menuMode == .globe ? .results : .globe)
+            case 2: return show(.save)
+            case 3: return show(.load)
+            case 4: return show(.options)
+            default: return .handled
             }
-        case .results:
+        case .save:
+            if index == 4 { return .close }
+            // SAVE SUCCESSFUL (262) or *** SAVE ERROR (263) in the last row.
+            statusCaption = GameText.shared.command(SaveGame.shared.save(index) ? 262 : 263)
+            publishMenuState()
+            return .handled
+        case .load:
+            if index == 4 { return .close }
+            return SaveGame.shared.load(index) ? .loaded : .handled
+        case .options:
             switch index {
             case 0:
-                return .close
-            case 1:
-                menuMode = .globe
+                engine.audioPlayer.musicMuted.toggle()
                 publishMenuState()
                 return .handled
-            case 4:
-                menuMode = .quitConfirmation
-                publishMenuState()
-                return .handled
-            default:
-                return .handled
+            case 1: return .restart
+            case 2: return show(.quitConfirmation)
+            case 3: return .close
+            default: return .handled
             }
         case .quitConfirmation:
             switch index {

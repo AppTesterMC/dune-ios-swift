@@ -955,6 +955,13 @@ final class Game: DuneNode {
                             closeOverlay()
                         case .quit:
                             engine.exitProgram(nil)
+                        case .loaded:
+                            closeOverlay()
+                            gameState.reset()
+                            showCurrentPlace()
+                        case .restart:
+                            closeOverlay()
+                            onEnable()
                         case .handled:
                             break
                         }
@@ -988,6 +995,13 @@ final class Game: DuneNode {
                         closeOverlay()
                     case .quit:
                         engine.exitProgram(nil)
+                    case .loaded:
+                        closeOverlay()
+                        gameState.reset()
+                        showCurrentPlace()
+                    case .restart:
+                        closeOverlay()
+                        onEnable()
                     case .handled:
                         break
                     }
