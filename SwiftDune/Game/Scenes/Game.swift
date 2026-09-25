@@ -295,15 +295,15 @@ final class Game: DuneNode {
         flight = (destination, cells, clock + Double(max(1, cells)) * 3.834)
         engine.logger.log(.info, "Flight: \(world.currentLocation) -> \(destination), \(cells) cells")
 
-        if findNode("DesertWalk") == nil { attachNode(DesertWalk()) }
+        // The floppy flight view: DUNES.HSQ pieces streaming from the
+        // horizon under the sky of the hour (Flight.swift, which the ScummVM
+        // engine's DesertFlight also follows).
         if findNode("Flight") == nil { attachNode(Flight()) }
-        findNode("DesertWalk")?.params = ["interactive": false, "destinationCode": destination, "travelStep": 0]
         findNode("Flight")?.params = [
             "dayMode": gameState.phase.lightMode,
             "destinationCode": destination,
             "duration": TimeInterval.greatestFiniteMagnitude
         ]
-        setNodeActive("DesertWalk", true, .background)
         setNodeActive("Flight", true, .background)
         var items: [UInt16] = []
         if let skip = GameText.shared.findCommand("SKIP TO DESTINATION") { items.append(UInt16(skip)) }
