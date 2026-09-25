@@ -241,7 +241,8 @@ final class UI: DuneNode {
                     ? menuCaptions![i]
                     : commands.sentence(at: menuItems[i])
                 font.paletteIndex = i == selectedMenuIndex ? darkColorIndex : lightColorIndex
-                font.render(sentence, rect: menuItemTextRect, buffer: buffer, style: .small)
+                let row = font.fit(sentence, width: Int(menuItemTextRect.width) - 2, style: .small)
+                font.render(row, rect: menuItemTextRect, buffer: buffer, style: .small)
             }
 
             i += 1

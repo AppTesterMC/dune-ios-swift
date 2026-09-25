@@ -86,14 +86,7 @@ final class Fresk: DuneNode {
         }
         
         globe.update(currentTime)
-
-        EventManager.uiStateChangedEvent.notify(UIStateEventData(
-            leftPanel: .globe,
-            rightPanel: .rect,
-            items: menuItems,
-            day: GameState.shared.day,
-            phase: GameState.shared.phase
-        ))
+        publishMenuState(recomputeRows: false)
     }
 
 
@@ -139,15 +132,21 @@ final class Fresk: DuneNode {
     private var statusCaption: String?
 
 
-    private func publishMenuState() {
-        let saving = menuMode == .save || menuMode == .load
+    /// Save/load row texts, computed when the menu changes (they read the
+    /// slot files), not every frame.
+    private var rowCaptions: [String]?
+
+    private func publishMenuState(recomputeRows: Bool = true) {
+        if recomputeRows {
+            rowCaptions = menuMode == .save || menuMode == .load ? slotCaptions : nil
+        }
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .globe,
             rightPanel: .rect,
             items: menuItems,
             day: GameState.shared.day,
             phase: GameState.shared.phase,
-            captions: saving ? slotCaptions : nil
+            captions: rowCaptions
         ))
     }
 

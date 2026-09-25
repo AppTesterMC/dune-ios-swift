@@ -124,6 +124,24 @@ final class GameFont {
     }
     
     
+    /// The longest prefix of `text` that fits in `width` pixels on one line
+    /// (command rows never wrap).
+    func fit(_ text: String, width: Int, style: FontSize) -> String {
+        // Measured the way render() lays a line out: word widths plus one
+        // space width between words.
+        let space = style == .small ? min(6, spaceWidth) : spaceWidth
+        func lineWidth(_ line: String) -> Int {
+            let words = line.split(separator: " ")
+            return words.reduce(0) { $0 + self.width(for: String($1), style: style) } + space * max(0, words.count - 1)
+        }
+        var result = text
+        while !result.isEmpty && lineWidth(result) >= width {
+            result.removeLast()
+        }
+        return result
+    }
+
+
     private func width(for text: String, style: FontSize) -> Int {
         var width = 0
         var i = 0

@@ -39,9 +39,9 @@ final class DevHarness {
 
     private init() {
         let environment = ProcessInfo.processInfo.environment
-        startInGame = environment["DUNE_START"]?.lowercased() == "game"
         startTime = environment["DUNE_TIME"].flatMap { UInt16($0) }
         loadSlot = environment["DUNE_LOAD"].flatMap { Int($0) }
+        startInGame = environment["DUNE_START"]?.lowercased() == "game" || loadSlot != nil
 
         steps = (environment["DUNE_SCRIPT"] ?? "")
             .split(separator: ";")
