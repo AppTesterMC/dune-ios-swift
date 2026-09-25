@@ -11,6 +11,8 @@
 //    DUNE_TIME=<n>            start the game clock (ds:2) at n (16 per day)
 //    DUNE_LOAD=<slot>         start from DUNE21S<slot>.SAV (0-4 ship with the game)
 //    DUNE_LOG_MEMORY=1        log the memory footprint every 5 s
+//    DUNE_PHASE=<hex>         start a new game at this story phase (ds:2A)
+//  Script actions handled by the game: place:<index>, point:<lat>,<lng>
 //    DUNE_SCRIPT=<steps>      ';'-separated "<seconds>:<action>[:<arg>]"
 //        key:<esc|ret|del|left|right|up|down|c>   press a key (c = one char)
 //        click:<x>,<y>                           click at a game pixel
@@ -30,6 +32,7 @@ final class DevHarness {
     let startInGame: Bool
     let startTime: UInt16?
     let loadSlot: Int?
+    let startPhase: UInt8?
     private let logMemory: Bool
     private var nextMemoryLog: TimeInterval = 0
 
@@ -48,6 +51,7 @@ final class DevHarness {
         startTime = environment["DUNE_TIME"].flatMap { UInt16($0) }
         loadSlot = environment["DUNE_LOAD"].flatMap { Int($0) }
         logMemory = environment["DUNE_LOG_MEMORY"] != nil
+        startPhase = environment["DUNE_PHASE"].flatMap { UInt8($0, radix: 16) }
         startInGame = environment["DUNE_START"]?.lowercased() == "game" || loadSlot != nil
 
         steps = (environment["DUNE_SCRIPT"] ?? "")

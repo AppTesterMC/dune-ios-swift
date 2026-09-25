@@ -53,9 +53,17 @@ final class Game: DuneNode {
     private var sietchActive = false
     /// The flat map is open (SEE DUNE MAP, or choosing where to fly).
     private var mapActive = false
-    /// Flying to a place: destination index and arrival time.
+    /// Flying to a place (index) or to a desert point (-1): arrival time.
     private var flight: (destination: Int, cells: Int, arrival: TimeInterval)?
+    private var flightPoint: (latitude: Int, longitude: UInt16)?
     private var clock: TimeInterval = 0
+    /// Paul in the open desert (ds:8 = 0xFF).
+    private var inDesert = false
+    /// How long Paul has waited in a room or the desert with nothing open
+    /// (idle_room_message_check, seg000:2b2a); input resets it.
+    private var idleTime: TimeInterval = 0
+    /// A vision dream is on screen (VIS.HSQ behind the line).
+    private var dreaming = false
     private let gameState = GameState.shared
     
     init() {
@@ -88,6 +96,15 @@ final class Game: DuneNode {
 
       showUI()
       showCurrentPlace()
+      if let phase = DevHarness.shared.startPhase {
+          world.setB(World.phase, phase)
+      }
+      DevHarness.shared.handlers["point"] = { [weak self] argument in
+          let parts = argument.split(separator: ",").compactMap { Int($0) }
+          guard let self = self, self.mapActive, parts.count == 2 else { return }
+          self.flatMap.choosePoint(latitude: parts[0], longitude: UInt16(truncatingIfNeeded: parts[1]))
+          self.publishMapUI()
+      }
       DevHarness.shared.handlers["place"] = { [weak self] argument in
           guard let self = self, self.mapActive, let index = Int(argument) else { return }
           self.flatMap.choose(index)
@@ -185,7 +202,7 @@ final class Game: DuneNode {
     private func closeMap() {
         mapActive = false
         setNodeActive("FlatMap", false)
-        showCurrentPlace()
+        if inDesert { showDesert() } else { showCurrentPlace() }
     }
 
     private enum MapRow { case exit, fly, orders, contact, density, takeOrnithopter, prospectors }
@@ -205,7 +222,7 @@ final class Game: DuneNode {
         let map = flatMap
         let phase = world.b(World.phase)
         add(.exit, "EXIT MAPS")
-        if map.selecting, let destination = map.destination, destination != world.currentLocation {
+        if map.selecting, (map.destination.map { $0 != world.currentLocation || inDesert } ?? false) || map.point != nil {
             add(.fly, "GO THERE FLYING AN ORNI")
         }
         if world.w(0x1176) < 2 {
@@ -262,6 +279,8 @@ final class Game: DuneNode {
         case .fly:
             if let destination = map.destination {
                 fly(to: destination)
+            } else if let point = map.point {
+                fly(toLatitude: point.latitude, longitude: point.longitude)
             }
         case .density:
             map.density.toggle()
@@ -287,14 +306,52 @@ final class Game: DuneNode {
         setNodeActive("Sietch", false)
         sietchActive = false
 
-        let from = world.location(world.currentLocation), to = world.location(destination)
-        let cells = world.cellDistance(fromLatitude: Int(from.latitude), longitude: from.longitude,
+        let to = world.location(destination)
+        let origin = travelOrigin()
+        let cells = world.cellDistance(fromLatitude: origin.latitude, longitude: origin.longitude,
                                        toLatitude: Int(to.latitude), longitude: to.longitude)
-        world.adjustOrnithopters(world.currentLocation, -1)
-        world.setRoom(1)
+        leaveForFlight()
         flight = (destination, cells, clock + Double(max(1, cells)) * 3.834)
+        flightPoint = nil
         engine.logger.log(.info, "Flight: \(world.currentLocation) -> \(destination), \(cells) cells")
+        startFlightView(destination)
+    }
 
+    /// Where a flight starts: the place, or the desert point Paul stands on.
+    private func travelOrigin() -> (latitude: Int, longitude: UInt16) {
+        if inDesert, let here = desertPosition { return here }
+        let l = world.location(world.currentLocation)
+        return (Int(l.latitude), l.longitude)
+    }
+
+    /// Take-off: from a place's room 1 with one ornithopter less there.
+    private func leaveForFlight() {
+        mapActive = false
+        setNodeActive("FlatMap", false)
+        setNodeActive("Palace", false)
+        setNodeActive("Sietch", false)
+        setNodeActive("OpenDesert", false)
+        sietchActive = false
+        if !inDesert {
+            world.adjustOrnithopters(world.currentLocation, -1)
+            world.setRoom(1)
+        }
+        inDesert = false
+    }
+
+    /// GO THERE FLYING AN ORNI to a desert point.
+    private func fly(toLatitude latitude: Int, longitude: UInt16) {
+        let origin = travelOrigin()
+        let cells = world.cellDistance(fromLatitude: origin.latitude, longitude: origin.longitude,
+                                       toLatitude: latitude, longitude: longitude)
+        leaveForFlight()
+        flight = (-1, cells, clock + Double(max(1, cells)) * 3.834)
+        flightPoint = (latitude, longitude)
+        engine.logger.log(.info, "Flight: to the desert at \(longitude)/\(latitude), \(cells) cells")
+        startFlightView(-1)
+    }
+
+    private func startFlightView(_ destination: Int) {
         // The floppy flight view: DUNES.HSQ pieces streaming from the
         // horizon under the sky of the hour (Flight.swift, which the ScummVM
         // engine's DesertFlight also follows).
@@ -322,6 +379,10 @@ final class Game: DuneNode {
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
         gameState.passPeriods(trip.cells / 16)
+        if trip.destination < 0, let point = flightPoint {
+            landInDesert(point)
+            return
+        }
         world.discover(trip.destination)
         world.setPosition(location: trip.destination, room: 1)
         world.adjustOrnithopters(trip.destination, 1)
@@ -329,6 +390,129 @@ final class Game: DuneNode {
         engine.logger.log(.info, "Flight: landed at \(trip.destination) (\(world.locationName(trip.destination, GameText.shared.command)))")
         showCurrentPlace()
         roomEntryScan()
+    }
+
+
+    /// Where Paul stands in the open desert (not in the segment's layout;
+    /// the flight's point).
+    private var desertPosition: (latitude: Int, longitude: UInt16)?
+
+    private func landInDesert(_ point: (latitude: Int, longitude: UInt16)) {
+        inDesert = true
+        desertPosition = point
+        world.setB(8, 0xFF)
+        idleTime = 0
+        engine.logger.log(.info, "Desert: Paul lands in the open desert")
+        showDesert()
+    }
+
+    private enum DesertRow { case map, worm, wait, ornithopter }
+
+    /// Outside a place (seg000:2faa): SEE DUNE MAP, CALL A WORM (greyed
+    /// before phase 0x4F; worms are not ported), WAIT FOR EVENING before
+    /// period 11 else WAIT FOR MORNING, TAKE AN ORNITHOPTER.
+    private func desertRows() -> [(row: DesertRow, id: UInt16, greyed: Bool)] {
+        var rows: [(row: DesertRow, id: UInt16, greyed: Bool)] = []
+        let text = GameText.shared
+        func add(_ row: DesertRow, _ caption: String, _ greyed: Bool = false) {
+            if let id = text.findCommand(caption) { rows.append((row, UInt16(id), greyed)) }
+        }
+        add(.map, "SEE DUNE MAP")
+        add(.worm, "CALL A WORM", true)
+        add(.wait, world.hour < 11 ? "WAIT FOR EVENING" : "WAIT FOR MORNING")
+        add(.ornithopter, "TAKE AN ORNITHOPTER")
+        return rows
+    }
+
+    private func showDesert() {
+        if findNode("OpenDesert") == nil { attachNode(OpenDesert()) }
+        setNodeActive("Palace", false)
+        setNodeActive("Sietch", false)
+        setNodeActive("OpenDesert", true, .background)
+        let rows = desertRows()
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed, rightPanel: .roomDirections, items: rows.map { $0.id }, directions: [],
+            day: gameState.day, phase: gameState.phase, greyed: rows.map { $0.greyed }))
+    }
+
+    private func handleDesertRow(_ index: Int) {
+        let rows = desertRows()
+        guard index >= 0 && index < rows.count, !rows[index].greyed else { return }
+        switch rows[index].row {
+        case .map:
+            setNodeActive("OpenDesert", false)
+            openMap(select: false, caption: true)
+        case .ornithopter:
+            setNodeActive("OpenDesert", false)
+            openMap(select: true, caption: false)
+        case .wait:
+            // To period 12 (evening) or to the next period 0 (morning). The
+            // wait counts as idle time for the first vision.
+            let target = world.hour < 11 ? 12 : 16
+            gameState.passPeriods(target - world.hour)
+            idleTime += 5
+            showDesert()
+        case .worm:
+            break
+        }
+    }
+
+
+    // MARK: - Visions
+
+    /// idle_room_message_check (seg000:2b2a): at phase 0x14, alone in the
+    /// desert for 4,993 ms, the first vision; later the queued visions, in
+    /// person after 250 ms when the sender is here, else as a dream after
+    /// 2,247 ms.
+    private func checkIdle(_ elapsed: TimeInterval) {
+        let busy = mapActive || flight != nil || dialogueCharacter != nil || conversation != nil
+            || isOverlayActive("Dialogue") || isOverlayActive("Book") || isOverlayActive("Fresk")
+            || isOverlayActive("Communication")
+        if busy { idleTime = 0; return }
+        idleTime += elapsed
+        let phase = world.b(World.phase)
+        if phase < 0x14 { return }
+        if phase == 0x14 {
+            if inDesert && world.w(World.personsWith) == 0 && idleTime >= 4.993 {
+                world.firstVision()
+                story.runPhaseTriggers()
+                idleTime = 0
+                presentVision(dream: true)
+            }
+            return
+        }
+        guard world.visionCount > 0 else { return }
+        let sender = Int(world.vision(0).id >> 8)
+        let present = sender < 16 && sender != 0x0F && world.peopleInRoom().contains(sender) && !inDesert
+        if present && idleTime >= 0.25 {
+            presentVision(dream: false)
+        } else if idleTime >= 2.247 {
+            presentVision(dream: true)
+        }
+    }
+
+    /// present_vision_message (seg000:2b00): DIALOGUE character 16 list 4,
+    /// ds:EA = the id's low byte, spoken by the sender or dreamt over VIS.HSQ.
+    private func presentVision(dream: Bool) {
+        guard world.visionCount > 0 else { return }
+        let vision = world.vision(0)
+        world.dequeueVision()
+        let sender = UInt8(vision.id >> 8)
+        if !dream { world.purgeVisions(sender: sender, location: vision.location) }
+        world.setB(World.visionType, UInt8(vision.id & 0xFF))
+        engine.logger.log(.info, "Vision: message \(String(vision.id, radix: 16)) (\(dream ? "dream" : "in person"))")
+        dreaming = dream
+        if dream {
+            if findNode("VisionDream") == nil { attachNode(VisionDream()) }
+            setNodeActive("VisionDream", true, .foreground)
+        } else if let speaker = duneCharacter(number: Int(sender)) {
+            dialogueCharacter = speaker
+            showRoomOrSietch()
+        }
+        conversation = Conversation(story: story, character: 16, list: 4, mask: 0, oneList: true)
+        showNextConversationPage()
+        world.setB(World.visionType, 0xFF)
+        idleTime = 0
     }
 
 
@@ -749,6 +933,12 @@ final class Game: DuneNode {
         guard let conversation = conversation, let page = conversation.next() else {
             self.conversation = nil
             setNodeActive("Dialogue", false)
+            if dreaming {
+                dreaming = false
+                setNodeActive("VisionDream", false)
+                if inDesert { showDesert() } else { showCurrentPlace() }
+                return false
+            }
             // A line may have moved the story (phase, doors, people).
             publishDialogueUI()
             return false
@@ -963,6 +1153,7 @@ final class Game: DuneNode {
         if let flight = flight, clock >= flight.arrival {
             arrive()
         }
+        checkIdle(elapsedTime)
         super.update(elapsedTime)
     }
 
@@ -1027,6 +1218,7 @@ final class Game: DuneNode {
 
 
     override func onKey(_ key: DuneKeyEvent) {
+        idleTime = 0
         if isOverlayActive("Communication") {
             if key.specialKey == .keyEscape || key.char == " " || key.specialKey == .keyReturn {
                 setNodeActive("Communication", false)
@@ -1187,6 +1379,12 @@ final class Game: DuneNode {
 
 
     override func onClick(_ event: DuneMouseClickEvent) {
+        idleTime = 0
+        if inDesert && !mapActive && flight == nil && !isOverlayActive("Dialogue") && !isOverlayActive("Fresk")
+            && !isOverlayActive("Book") && menuRect.contains(event.point) {
+            handleDesertRow(Int((event.point.y - menuRect.y) / 8))
+            return
+        }
         if isOverlayActive("Communication") {
             let point = event.point
             if point.y < 152 {

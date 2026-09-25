@@ -25,6 +25,8 @@ final class FlatMap: DuneNode {
     private(set) var selecting = false
     /// The place tapped, its popup shown.
     private(set) var destination: Int?
+    /// A desert point chosen instead of a place (latitude, longitude).
+    private(set) var point: (latitude: Int, longitude: UInt16)?
     /// SEE SPICE DENSITY: rings around the known sietches.
     var density = false
     /// The DUNE MAP box shown when the map opens from a room (4,993 ms).
@@ -54,6 +56,7 @@ final class FlatMap: DuneNode {
         if let selecting = params["select"] as? Bool {
             self.selecting = selecting
             destination = nil
+            point = nil
             density = false
             captionUntil = (params["caption"] as? Bool ?? false) ? currentTime + 4.993 : 0
             centreOn(world.currentLocation)
@@ -80,6 +83,14 @@ final class FlatMap: DuneNode {
     }
 
 
+    /// Chooses a desert point directly (dev harness).
+    func choosePoint(latitude: Int, longitude: UInt16) {
+        destination = nil
+        point = (latitude, longitude)
+        captionUntil = 0
+    }
+
+
     /// Chooses a place directly (dev harness).
     func choose(_ index: Int) {
         centreOn(index)
@@ -95,6 +106,12 @@ final class FlatMap: DuneNode {
         captionUntil = 0
         let index = hitIndex[Int(point.y) * 320 + Int(point.x)]
         destination = index == 0xFF ? nil : Int(index)
+        self.point = nil
+        if destination == nil && selecting {
+            // Choosing where to fly: the open desert under the tap.
+            self.point = world.mapRenderer.unproject(latitude: latitude, longitude: longitude,
+                                                     x: Int(point.x), y: Int(point.y)).map { ($0.0, $0.1) }
+        }
         return true
     }
 
@@ -119,6 +136,13 @@ final class FlatMap: DuneNode {
         }
 
         drawIcons(buffer, icons)
+        if let point = point,
+           let p = world.mapRenderer.project(latitude: latitude, longitude: longitude,
+                                             placeLatitude: point.latitude, placeLongitude: point.longitude) {
+            // The destination mark (seg000:49a0): a small cross.
+            Primitives.drawLine(DunePoint(p.x - 3, p.y), DunePoint(p.x + 3, p.y), 0xFC, buffer, isOffset: false)
+            Primitives.drawLine(DunePoint(p.x, p.y - 3), DunePoint(p.x, p.y + 3), 0xFC, buffer, isOffset: false)
+        }
         if let destination = destination {
             drawPopup(buffer, destination)
         } else if currentTime < captionUntil {
