@@ -84,3 +84,26 @@ here:
 - Reverse-engineering sources, in lookup order: madmoose/chani database,
   OpenRakis `DNCDPRG_RECENT.ASM`, madmoose/dune-rust (playability baseline),
   codingstyle/swift-dune (scene composition). Credit them per file.
+
+## Testing
+
+`scripts/sim_run.sh <run> <seconds> [VAR=value ...]` builds for the
+simulator, runs the app on an iPhone 14 Pro simulator (iOS 16.4 runtime
+when installed, as on the test phone) and copies screenshots and the log to
+`build/shots/<run>/`. It waits until the Mac has been idle for five minutes
+(the owner asked for tests only while the laptop is not in use), runs
+headless and shuts the simulator down afterwards.
+
+Harness variables (see `Engine/DevHarness.swift`): `DUNE_START=game`,
+`DUNE_LOAD=<slot>`, `DUNE_TIME=<n>`, `DUNE_PHASE=<hex>`,
+`DUNE_SCRIPT=<t>:<action>[:<arg>];...` with `key`, `click`, `hover`,
+`shot`, `place`, `point`, plus `DUNE_LOG_MARKERS` and `DUNE_LOG_MEMORY`.
+
+## Gameplay ported from the ScummVM Dune engine
+
+`Game/World/`: the executable's data segment (`World`), text codes
+(`GameText`), CONDIT/DIALOGUE (`Dialogue`), saves (`SaveGame`), the flat
+map (`MapRenderer`) and troops (`Troops`). `SCUMMVM_GAP_ANALYSIS.md` lists
+what the ScummVM engine has that SwiftDune still lacks: shipments and the
+COMM room, scripted scenes, the troop contact popup and marches, ecology,
+battles, worms, endings and the music per place.
