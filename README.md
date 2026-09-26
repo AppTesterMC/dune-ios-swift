@@ -88,8 +88,7 @@ The script generates `SwiftDuneiOS.xcodeproj` from
 
 - The iOS SDK defaults to `iphoneos26.5`. Set `IOS_SDK=iphoneos<version>` to
   match your Xcode (`xcodebuild -showsdks` lists them).
-- The IPA is **ad-hoc signed**. Install it with
-  [TrollStore](https://github.com/opa334/TrollStore), or open
+- The IPA is **ad-hoc signed**. Sideload it, or open
   `SwiftDuneiOS.xcodeproj` in Xcode and run it on your device with your own
   signing team.
 - `scripts/build_ios.sh sim` builds for the iOS simulator instead.
