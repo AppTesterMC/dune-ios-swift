@@ -45,6 +45,9 @@ final class Palace: DuneNode {
     private var sheet: String?
     /// Character numbers in the room; placed with World.markerAssignment.
     private var people: [Int]?
+    /// A scripted scene's cast: written straight into the marker slots
+    /// (opcode 00), marker j showing slot markers - 1 - j.
+    private var cast: [Int]?
     private var character: DuneCharacter = .none
     private var zoomRect: DuneRect?
     private var dayMode: DuneLightMode = .day
@@ -76,7 +79,15 @@ final class Palace: DuneNode {
             engine.logger.log(.debug, "applyPeople skipped: people \(String(describing: people)) scenery \(palaceScenery != nil) sal \(String(describing: salRoomIndex))")
             return
         }
-        let assignment = World.shared.markerAssignment(people: people, markers: scenery.rooms[sal].markerCount)
+        var assignment = World.shared.markerAssignment(people: people, markers: scenery.rooms[sal].markerCount)
+        if let cast = cast {
+            let markers = scenery.rooms[sal].markerCount
+            assignment = [:]
+            for j in 0..<markers {
+                let slot = markers - 1 - j
+                if slot < cast.count && cast[slot] != 0xFF { assignment[j] = cast[slot] }
+            }
+        }
         markers = assignment.compactMapValues { RoomCharacter(rawValue: World.persFrame($0)) }
         scenery.characters = markers
         engine.logger.log(.debug, "applyPeople sal \(sal) markers \(scenery.rooms[sal].markerCount) people \(people) -> \(assignment)")
@@ -93,6 +104,7 @@ final class Palace: DuneNode {
         outdoor = nil
         sheet = nil
         people = nil
+        cast = nil
         character = .none
         currentRoom = .stairs
         gameRoomID = nil
@@ -143,6 +155,12 @@ final class Palace: DuneNode {
 
         if let people = params["people"] as? [Int] {
             self.people = people
+            cast = nil
+            applyPeople()
+        }
+
+        if let cast = params["cast"] as? [Int] {
+            self.cast = cast
             applyPeople()
         }
 

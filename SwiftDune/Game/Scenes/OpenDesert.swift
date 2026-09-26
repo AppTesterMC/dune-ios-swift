@@ -118,3 +118,45 @@ final class EndingScreen: DuneNode {
         font.render(text, rect: DuneRect(24, 20, 272, 112), buffer: buffer, alignment: .center, style: .normal)
     }
 }
+
+
+/// Pictures of the scripted scenes: CHANKISS (sprite 0 at 78,33 or sprite
+/// 1 at 26,4, over the room) and FINAL.HSQ (sprites 0-2 at the origin, then
+/// 3 at 52,0 and 4 at 90,64), from the draw lists at ds:2290 / seg000:14ac.
+final class ScenePicture: DuneNode {
+    private var kiss = 0
+    private var final = 0
+    private lazy var kissSprite = Sprite("CHANKISS.HSQ")
+    private lazy var finalSprite = Sprite("FINAL.HSQ")
+
+    init() {
+        super.init("ScenePicture")
+    }
+
+    override func onParamsChange() {
+        kiss = params["kiss"] as? Int ?? 0
+        final = params["final"] as? Int ?? 0
+    }
+
+    override func render(_ buffer: PixelBuffer) {
+        if kiss > 0 {
+            let sprite = kissSprite
+            sprite.setPalette()
+            if kiss == 1 {
+                sprite.drawFrame(0, x: 78, y: 33, buffer: buffer)
+            } else {
+                sprite.drawFrame(1, x: 26, y: 4, buffer: buffer)
+            }
+        } else if final > 0 {
+            let sprite = finalSprite
+            sprite.setPalette()
+            Primitives.fillRect(DuneRect(0, 0, 320, 152), 0, buffer, isOffset: false)
+            if final == 1 {
+                for frame: UInt16 in 0..<3 { sprite.drawFrame(frame, x: 0, y: 0, buffer: buffer) }
+            } else {
+                sprite.drawFrame(3, x: 0x34, y: 0, buffer: buffer)
+                sprite.drawFrame(4, x: 0x5A, y: 0x40, buffer: buffer)
+            }
+        }
+    }
+}

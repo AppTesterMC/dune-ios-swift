@@ -275,6 +275,7 @@ final class World {
             vars = [UInt8](repeating: 0, count: World.size)
             vars.replaceSubrange(0..<available, with: image[start..<(start + available)])
             isFloppy = floppy
+            findSceneScripts(image)
             loaded = findTables()
             initialVars = vars
             logger.log(.info, "World: initial data from \(name) at \(start), tables \(loaded ? "found" : "missing")")
@@ -282,6 +283,52 @@ final class World {
         }
         logger.log(.error, "World: no DUNEPRG.EXE / DNCDPRG.EXE with the initial data segment")
     }
+
+    // MARK: Scripted scenes
+
+    private static var code: [UInt8] = []
+    private static var scriptBase = -1
+    private static var scriptDelta = 0
+
+    /// The scripted scenes (the " Continue..." sequences, seg000:1707) live
+    /// in the code. The phase-scene handler loads their offsets as
+    /// immediates (mov bl,[2a]; mov ax,X; cmp bl,14h); the first, 0x12F8
+    /// on the CD, is the prospector's lesson (bytes 0E 10 FF), which fixes
+    /// where the code starts in the image (ScummVM findSceneScripts).
+    private func findSceneScripts(_ image: [UInt8]) {
+        World.scriptBase = -1
+        let head: [UInt8] = [0x8A, 0x1E, 0x2A, 0x00, 0xB8]
+        var p = 0
+        while p + 32 <= image.count {
+            if image[p] == head[0] && Array(image[p..<(p + 5)]) == head && image[p + 7] == 0x80
+                && image[p + 8] == 0xFB && image[p + 9] == 0x14 {
+                let x = Int(image[p + 5]) | Int(image[p + 6]) << 8
+                let headerSize = image.count > 0x20 && image[0] == 0x4D && image[1] == 0x5A
+                    ? (Int(image[8]) | Int(image[9]) << 8) * 16 : 0
+                for base in [0, headerSize] {
+                    let at = base + x
+                    if at + 3 <= image.count && image[at] == 0x0E && image[at + 1] == 0x10 && image[at + 2] == 0xFF {
+                        World.scriptBase = base
+                        World.scriptDelta = x - 0x12F8
+                        World.code = image
+                        DuneEngine.shared.logger.log(.info, "World: scripted scenes at code offset delta \(x - 0x12F8)")
+                        return
+                    }
+                }
+            }
+            p += 1
+        }
+        DuneEngine.shared.logger.log(.warn, "World: the scripted scenes were not found in the executable")
+    }
+
+    /// Up to 96 bytes of the scene script at CD code offset `cdOffset`.
+    func sceneScript(_ cdOffset: UInt16) -> [UInt8] {
+        guard World.scriptBase >= 0 else { return [] }
+        let at = World.scriptBase + Int(cdOffset) + World.scriptDelta
+        guard at >= 0 && at < World.code.count else { return [] }
+        return Array(World.code[at..<min(at + 96, World.code.count)])
+    }
+
 
     private func find(_ needle: [UInt8], in haystack: [UInt8], from: Int) -> Int? {
         guard haystack.count >= needle.count else { return nil }

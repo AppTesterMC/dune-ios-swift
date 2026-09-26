@@ -302,8 +302,15 @@ final class Story {
     let conditions = Conditions()
     /// Lines recorded for the book: character << 11 | entry offset / 4.
     var notebook: [UInt16] = []
-    /// Scripted scene (CD code offset) a line or phase asked for; not played yet.
+    /// Scripted scene (CD code offset) a line or phase asked for.
     private(set) var pendingScene: UInt16 = 0
+
+    /// The scene to play next, once (the game starts it when idle).
+    func takePendingScene() -> UInt16? {
+        guard pendingScene != 0 else { return nil }
+        defer { pendingScene = 0 }
+        return pendingScene
+    }
 
     private init() {}
 

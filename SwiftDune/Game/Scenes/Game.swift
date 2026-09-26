@@ -65,6 +65,12 @@ final class Game: DuneNode {
     private var idleTime: TimeInterval = 0
     /// A vision dream is on screen (VIS.HSQ behind the line).
     private var dreaming = false
+    /// A scripted scene: its bytes, the next one, the room to return to.
+    private var scene: [UInt8] = []
+    private var sceneCursor = 0
+    private var sceneActive = false
+    private var sceneReturnRoom = 0
+    private var sceneWaiting = false
     private let gameState = GameState.shared
     
     init() {
@@ -459,17 +465,144 @@ final class Game: DuneNode {
     }
 
 
+    // MARK: - Scripted scenes
+
+    /// A " Continue..." sequence read from the executable (seg000:1707).
+    private func startScene(_ script: UInt16) {
+        let bytes = world.sceneScript(script)
+        guard !bytes.isEmpty else {
+            engine.logger.log(.warn, "Scene: script \(String(script, radix: 16)) not found")
+            return
+        }
+        scene = bytes
+        sceneCursor = 0
+        sceneActive = true
+        sceneReturnRoom = world.room
+        engine.logger.log(.info, "Scene: script \(String(script, radix: 16)) starts")
+        sceneStep()
+    }
+
+    /// menu_callback_choice_continue (seg000:171a): the next action byte
+    /// (a byte offset into the table at cs:1475); 0xFF ends the scene.
+    private func sceneStep() {
+        func arg() -> Int { sceneCursor < scene.count ? Int(scene[sceneCursor]) : 0xFF }
+        while sceneActive && sceneCursor < scene.count {
+            let op = scene[sceneCursor]
+            sceneCursor += 1
+            if op == 0xFF { break }
+            switch op {
+            case 0x00, 0x12:
+                // [room, count, cast...]: the shot (sub_113c8); 0x12 through a transition.
+                let room = arg(); sceneCursor += 1
+                let count = arg()
+                var cast: [Int] = []
+                for i in 0..<count where sceneCursor + 1 + i < scene.count { cast.append(Int(scene[sceneCursor + 1 + i])) }
+                sceneCursor += 1 + count
+                world.setRoom(room)
+                if let palace = findNode("Palace"), let record = world.currentRoomRecord() {
+                    palace.params = ["room": PalaceRoom(rawValue: record.salRoom) ?? .porch, "salRoom": record.salRoom,
+                                     "gameRoomID": room, "sheet": world.sheet(for: record), "people": [Int](),
+                                     "cast": cast, "salFile": World.salFile(world.placeType),
+                                     "outdoor": world.isOutdoors(record, placeType: world.placeType)]
+                    setNodeActive("Palace", true, .background)
+                }
+                setNodeActive("ScenePicture", false)
+            case 0x04:
+                break // redraw, step on
+            case 0x02:
+                // [speaker]: the speaker's next list-7 line (seg000:9761).
+                let who = arg(); sceneCursor += 1
+                sceneLine(who)
+                return
+            case 0x06:
+                sceneCursor += 1 // [speaker]: the head, silent
+            case 0x08:
+                waitForContinue() // " Continue..."
+                return
+            case 0x0A:
+                // The evening comes; CHANKISS sprite 0 at (78,33).
+                while world.hour < 13 { gameState.passPeriods(1) }
+                showScenePicture(["kiss": 1])
+                waitForContinue()
+                return
+            case 0x0C:
+                showScenePicture(["kiss": 2]) // CHANKISS sprite 1 at (26,4)
+                waitForContinue()
+                return
+            case 0x0E, 0x10:
+                sceneLine(World.fremenChief) // the prospector's lesson
+                return
+            case 0x14:
+                showScenePicture(["final": 1]) // FINAL.HSQ
+                waitForContinue()
+                sceneCursor -= 1; scene[sceneCursor] = 0x15 // the second picture next
+                return
+            case 0x15:
+                showScenePicture(["final": 2])
+                waitForContinue()
+                return
+            case 0x16:
+                // The cast list, then the game is over.
+                sceneActive = false
+                setNodeActive("ScenePicture", false)
+                showEnding(277, through: 289)
+                return
+            default:
+                engine.logger.log(.warn, "Scene: action byte \(String(op, radix: 16)) not ported")
+            }
+        }
+        endScene()
+    }
+
+    private func sceneLine(_ who: Int) {
+        dialogueCharacter = duneCharacter(number: who)
+        if let palace = findNode("Palace"), let character = dialogueCharacter {
+            palace.params = ["character": character]
+        }
+        conversation = Conversation(story: story, character: min(who, World.fremenChief), list: 7, mask: 0x80,
+                                    oneList: true, single: true)
+        if !showNextConversationPage() { return }
+    }
+
+    private func waitForContinue() {
+        sceneWaiting = true
+        var items: [UInt16] = []
+        if let row = GameText.shared.findCommand(" Continue") { items.append(UInt16(row)) }
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed, rightPanel: .roomDirections, items: items, directions: [],
+            day: gameState.day, phase: gameState.phase))
+    }
+
+    private func showScenePicture(_ params: [String: Any]) {
+        if findNode("ScenePicture") == nil { attachNode(ScenePicture()) }
+        findNode("ScenePicture")?.params = params
+        setNodeActive("ScenePicture", true, .foreground)
+    }
+
+    /// seg000:11736: back to the room the scene started in.
+    private func endScene() {
+        sceneActive = false
+        sceneWaiting = false
+        setNodeActive("ScenePicture", false)
+        dialogueCharacter = nil
+        engine.logger.log(.info, "Scene: over")
+        world.setRoom(sceneReturnRoom > 0 ? sceneReturnRoom : world.room)
+        showCurrentPlace()
+    }
+
+
     // MARK: - Endings
 
     /// An ending (COMMAND 175-180): its text on black; a tap restarts.
-    private func showEnding(_ command: Int) {
+    private func showEnding(_ command: Int, through last: Int? = nil) {
         engine.logger.log(.info, "Ending: COMMAND \(command)")
         conversation = nil
         dialogueCharacter = nil
         mapActive = false
         flight = nil
         if findNode("Ending") == nil { attachNode(EndingScreen()) }
-        findNode("Ending")?.params = ["text": GameText.shared.command(command)]
+        let text = (command...(last ?? command)).map { GameText.shared.command($0) }.joined(separator: "  ")
+        findNode("Ending")?.params = ["text": text]
         setNodeActive("Ending", true, .foreground)
         var items: [UInt16] = []
         if let restart = GameText.shared.findCommand("RESTART GAME") { items.append(UInt16(restart)) }
@@ -1029,6 +1162,11 @@ final class Game: DuneNode {
                 if inDesert { showDesert() } else { showCurrentPlace() }
                 return false
             }
+            if sceneActive {
+                dialogueCharacter = nil
+                sceneStep()
+                return false
+            }
             // A line may have moved the story (phase, doors, people).
             publishDialogueUI()
             return false
@@ -1237,6 +1375,10 @@ final class Game: DuneNode {
         if let ending = world.pendingEnding, !isOverlayActive("Ending") {
             showEnding(ending)
         }
+        if !sceneActive && conversation == nil && !isOverlayActive("Dialogue") && !mapActive && flight == nil,
+           let script = story.takePendingScene() {
+            startScene(script)
+        }
         super.update(elapsedTime)
     }
 
@@ -1436,6 +1578,11 @@ final class Game: DuneNode {
 
     override func onClick(_ event: DuneMouseClickEvent) {
         idleTime = 0
+        if sceneActive && sceneWaiting && !isOverlayActive("Dialogue") {
+            sceneWaiting = false
+            sceneStep() // " Continue..."
+            return
+        }
         if isOverlayActive("Ending") {
             setNodeActive("Ending", false)
             world.pendingEnding = nil
