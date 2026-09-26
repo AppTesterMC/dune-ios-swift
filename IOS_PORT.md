@@ -42,7 +42,9 @@ signing team. `scripts/build_ios.sh sim` builds for the simulator.
 | finger held/dragged on the picture | mouse hover (menu highlight follows the finger) |
 | swipe across the picture (≥ 20 % of its height) | arrow key in the swipe direction |
 | ESC, ⏎, SPC buttons | Escape / Return / space (skip intro, close overlays) |
-| ▲ ◀ ▶ ▼ buttons | arrow keys |
+| BOOK, MAP, GLOB | `b` book, `m` flat map, `g` globe and game menu (same as tapping Paul's head) |
+| ORDR, RSLT, PROS | `o` change the troop's order, `r` results, `p` find prospectors (see `Game.onKey`) |
+| ▲ ◀ ▶ ▼ buttons | arrow keys (rooms, desert walk, globe) |
 | hardware keyboard | same keys as on the Mac |
 
 ## iOS-specific behaviour
@@ -74,9 +76,43 @@ to `build/shots/<run>/`. It runs headless and shuts the simulator down
 afterwards.
 
 The variables are read by `Engine/DevHarness.swift`: `DUNE_START=game` skips
-the intro, and `DUNE_SCRIPT=<seconds>:<action>[:<arg>];...` plays timed `key`,
-`click`, `hover` and `shot` steps. For example:
+the intro, `DUNE_LOAD=<slot>` loads a save, `DUNE_TIME=<n>` and
+`DUNE_PHASE=<hex>` set the clock and the story phase, `DUNE_LOG_MEMORY` logs
+the memory footprint, and `DUNE_SCRIPT=<seconds>:<action>[:<arg>];...` plays
+timed `key`, `click`, `hover`, `shot`, `place` (choose a place on the flat
+map) and `scene` (play a scripted scene) steps. For example:
 
 ```sh
 scripts/sim_run.sh palace 20 DUNE_START=game "DUNE_SCRIPT=5:shot:start;8:key:right;10:shot:next"
 ```
+
+## Gameplay from the original executable
+
+The game logic in `Game/World/` is a port of the
+[Desert Frost ScummVM engine](https://github.com/AppTesterMC/desert-frost-engine)
+(`third_party/scummvm/engines/dune/`), whose `FINDINGS.md` is the reference for
+the data layouts:
+
+| File | What |
+|---|---|
+| `World.swift` | the executable's initial data segment (locations, rooms, characters, troops) |
+| `GameText.swift` | text codes in COMMAND/PHRASE strings |
+| `Dialogue.swift` | CONDIT/DIALOGUE, the story phases and their callbacks |
+| `SaveGame.swift` | the original `DUNE21S?.SAV` format |
+| `MapRenderer.swift` | the flat map |
+| `Troops.swift`, `Battles.swift` | troops, occupations, marches, battles, worms, the final attack |
+| `Shipments.swift`, `Ecology.swift` | the Emperor's shipments and the ecology route |
+| `MusicSituation.swift` | which song plays in which situation |
+
+Facts that matter when working on it:
+
+- Both releases read the initial data segment from the executable
+  (the floppy's `DUNEPRG.EXE` is LZEXE-packed), including the location, room
+  and character tables, so the executable must be in `DuneFiles/`.
+- The room byte's high nibble is a sheet slot whose table differs per release:
+  CD slot 0 = GENERIC, 6 = POR; floppy 0 = POR, 6 = SIET0, 8 = VILG, 9 = FORT.
+- Saves use the original `DUNE21S?.SAV` (floppy) / `DUNE37S?.SAV` (CD) format.
+- The clock and the spice-density table: `ORIGINAL_CLOCK_AND_LOCATION.md`.
+- Reverse-engineering sources, in lookup order: madmoose's chani database,
+  the OpenRakis `DNCDPRG_RECENT.ASM`, madmoose/dune-rust, and this project's
+  own scenes. Each file names its sources in its header.

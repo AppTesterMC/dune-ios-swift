@@ -69,10 +69,10 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         
         // Create the vertex descriptor
         let vertexDescriptor = MTLVertexDescriptor()
-        vertexDescriptor.attributes[0].format = .float3
+        vertexDescriptor.attributes[0].format = .float4
         vertexDescriptor.attributes[0].offset = 0
         vertexDescriptor.attributes[0].bufferIndex = 0
-        vertexDescriptor.attributes[1].format = .float3
+        vertexDescriptor.attributes[1].format = .float2
         vertexDescriptor.attributes[1].offset = 16
         vertexDescriptor.attributes[1].bufferIndex = 0
         vertexDescriptor.layouts[0].stride = 24

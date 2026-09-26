@@ -256,6 +256,12 @@ final class AudioPlayer {
     }
     
     /// Mutes the OPL3 output
+    /// MUSIC OFF / MUSIC ON in the globe's options (the OPL3 music only).
+    var musicMuted = false {
+        didSet { musicMuted ? muteOPL3() : unmuteOPL3() }
+    }
+
+
     func muteOPL3() {
         oplMixerNode.outputVolume = 0.0
     }

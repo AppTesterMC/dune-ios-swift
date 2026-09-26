@@ -87,6 +87,12 @@ final class GameViewController: UIViewController {
         configureColumn(leftColumn, keys: [
             ("ESC", DuneKeyEvent(specialKey: .keyEscape)),
             ("⏎", DuneKeyEvent(specialKey: .keyReturn)),
+            ("BOOK", DuneKeyEvent(char: "b")),
+            ("MAP", DuneKeyEvent(char: "m")),
+            ("ORDR", DuneKeyEvent(char: "o")),
+            ("RSLT", DuneKeyEvent(char: "r")),
+            ("GLOB", DuneKeyEvent(char: "g")),
+            ("PROS", DuneKeyEvent(char: "p")),
         ])
         configureColumn(rightColumn, keys: [
             ("▲", DuneKeyEvent(specialKey: .keyUp)),

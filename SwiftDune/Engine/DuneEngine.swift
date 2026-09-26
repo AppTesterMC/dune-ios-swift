@@ -35,6 +35,11 @@ final class DuneEngine {
     private var lastTime: TimeInterval = 0.0
 
     var rootNode: DuneNode
+
+    /// Palettes applied after every node has drawn this frame (the palette
+    /// is shared; a backdrop whose colours must win over overlays drawn on
+    /// top of it registers here, e.g. the vision dream's VIS.HSQ).
+    var finalPalettes: [() -> Void] = []
     
     var intermediateFrameBuffer: PixelBuffer
     
@@ -143,6 +148,8 @@ final class DuneEngine {
         
         currentOffscreenBuffer.clearBuffer()
         rootNode.render(currentOffscreenBuffer)
+        finalPalettes.forEach { $0() }
+        finalPalettes.removeAll()
         
         // Sends update to the front
         DispatchQueue.main.sync {

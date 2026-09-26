@@ -311,6 +311,7 @@ final class ResourceStream {
     func readByte(peek: Bool = false) -> UInt8 {
         if offset >= size {
             print("Trying to read offset \(offset) with size \(size)")
+            return 0
         }
         
         let b0 = data[Int(offset)]
@@ -418,13 +419,36 @@ final class Resource
     
     private var fileSize: UInt64 = 0
     
+    /// Asset cache: every file is read and decompressed once per run.
+    /// Arrays are copy-on-write, so all Resources of a file share one copy
+    /// (scenes re-create Scenery, Sprite and Sentence objects on every room
+    /// change and overlay).
+    private static var cache: [String: [UInt8]] = [:]
+    private static let cacheLock = NSLock()
+
     init(_ fileName: String, uncompressed: Bool = false) {
         self.fileName = fileName
+        let key = uncompressed ? "raw:" + fileName : fileName
+
+        Resource.cacheLock.lock()
+        let cached = Resource.cache[key]
+        Resource.cacheLock.unlock()
+        if let cached = cached {
+            unpackedData = cached
+            stream = ResourceStream(cached)
+            return
+        }
 
         if uncompressed {
             self.parseRaw()
         } else {
             self.parseHSQ()
+        }
+
+        if !unpackedData.isEmpty {
+            Resource.cacheLock.lock()
+            Resource.cache[key] = unpackedData
+            Resource.cacheLock.unlock()
         }
     }
     
@@ -691,4 +715,3 @@ extension FileHandle {
         }
     }
 }
-
