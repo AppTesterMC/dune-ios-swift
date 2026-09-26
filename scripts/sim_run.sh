@@ -11,7 +11,13 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 run="$1"; seconds="$2"; shift 2
-bundle=$(awk '/PRODUCT_BUNDLE_IDENTIFIER:/ {print $2; exit}' "$repo_root/project-ios.yml")
+bundle=com.codingstyle.SwiftDuneiOS
+# DUNE_CD=1 runs the CD release (scripts/build_ios.sh --cd).
+build_args=(sim)
+if [[ "${DUNE_CD:-0}" == 1 ]]; then
+  bundle=com.codingstyle.SwiftDuneiOS.CD
+  build_args+=(--cd)
+fi
 device_type=${SIM_DEVICE_TYPE:-com.apple.CoreSimulator.SimDeviceType.iPhone-14-Pro}
 
 cd "$repo_root"
@@ -29,7 +35,7 @@ print "simulator runtime: $runtime"
 sim=$(cat $udid_file)
 xcrun simctl boot $sim 2>/dev/null || true
 
-app=$(scripts/build_ios.sh sim | sed -n 's/^APP=//p')
+app=$(scripts/build_ios.sh "${build_args[@]}" | sed -n 's/^APP=//p')
 xcrun simctl terminate $sim $bundle 2>/dev/null || true
 xcrun simctl install $sim "$app"
 

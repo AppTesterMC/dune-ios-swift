@@ -30,13 +30,13 @@ targets:
           - "*.entitlements"
           - Assets.xcassets           # macOS icon set; iOS ships Platform/iOS/Icons
       - path: SwiftDune/Platform/iOS
-      - path: DuneFiles
+      - path: ${DUNE_DATA}          # DuneFiles (floppy) or DuneFilesCD (CD), set by scripts/build_ios.sh
         type: folder
         buildPhase: resources
     info:
       path: SwiftDune/Platform/iOS/Info.plist
       properties:
-        CFBundleDisplayName: Dune
+        CFBundleDisplayName: ${DUNE_APP_NAME}
         # Plain icon files instead of an asset catalog: actool needs a
         # simulator runtime matching the SDK, which clean builds lack.
         CFBundleIcons:
@@ -64,7 +64,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.codingstyle.SwiftDuneiOS
+        PRODUCT_BUNDLE_IDENTIFIER: ${DUNE_BUNDLE_ID}
         PRODUCT_NAME: Dune
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: "NO"

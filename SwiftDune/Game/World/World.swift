@@ -267,8 +267,8 @@ final class World {
     private func executable(_ name: String) -> [UInt8]? {
         let base = (name as NSString).deletingPathExtension
         let ext = (name as NSString).pathExtension
-        guard let url = Bundle.main.url(forResource: base, withExtension: ext, subdirectory: "DuneFiles"),
-              let data = try? Data(contentsOf: url) else { return nil }
+        _ = (base, ext)
+        guard let path = DuneArchive.path(name), let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
         let raw = [UInt8](data)
         if raw.count >= 32 && Array(raw[28..<32]) == Array("LZ91".utf8) {
             return Lzexe.unpack(raw)
@@ -528,6 +528,13 @@ final class World {
         vars[palaceTable + 5 * (room - 1) + 1 + direction] &= 0x7F
     }
 
+    /// The CD's approach clip for a kind of place (RESOURCE_LIST_HNM 6-10).
+    static func arrivalVideo(_ placeType: UInt8) -> String {
+        if placeType <= Location.sietchMax { return "SIET.HNM" }
+        if placeType <= Location.villageMax { return "PALACE.HNM" }
+        return "FORT.HNM"
+    }
+
     static func salFile(_ placeType: UInt8) -> String {
         if placeType <= Location.sietchMax { return "SIET.SAL" }
         if placeType == Location.palace { return "PALACE.SAL" }
@@ -554,7 +561,9 @@ final class World {
     /// (SIET0, VILG, FORT).
     func isOutdoors(_ record: RoomRecord, placeType: UInt8) -> Bool {
         if placeType == Location.palace { return record.salRoom == 10 || record.salRoom == 11 }
-        return [6, 8, 9].contains(record.sheetSlot)
+        // The floppy's exterior sheets SIET0, VILG, FORT (slots 6, 8, 9);
+        // the CD's GENERIC (slot 0), whose backdrop is the arrival clip.
+        return isFloppy ? [6, 8, 9].contains(record.sheetSlot) : record.sheetSlot == 0
     }
 
 

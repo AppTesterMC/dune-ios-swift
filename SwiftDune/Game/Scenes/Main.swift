@@ -31,7 +31,9 @@ final class Main: DuneNode {
             self.onNodeEvent(nodeData)
         }
         
-        if !DevHarness.shared.startInGame {
+        // The CD release has none of the floppy intro's files (its intro is
+        // HNM clips, not ported yet): it starts in the game.
+        if !DevHarness.shared.startInGame && !DuneArchive.isCD {
             queue.enqueue(DuneNodeParams("Logo"))
             queue.enqueue(DuneNodeParams("Intro"))
             queue.enqueue(DuneNodeParams("Credits"))

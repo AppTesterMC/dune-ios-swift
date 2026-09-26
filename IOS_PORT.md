@@ -38,6 +38,29 @@ The iOS app icon ships as plain PNGs (`SwiftDune/Platform/iOS/Icons`, listed
 under `CFBundleIcons`) rather than an asset catalog, because `actool` refuses
 to build a catalog without a simulator runtime that matches the SDK.
 
+## The CD release
+
+`scripts/build_ios.sh --cd` (with or without `sim`) builds the CD release as a
+separate app, "Dune CD" (`com.codingstyle.SwiftDuneiOS.CD`), bundling
+`DuneFilesCD/` instead of `DuneFiles/`: put the CD's `DUNE.DAT` and
+`DNCDPRG.EXE` there. The script regenerates the project for the CD and puts
+the floppy defaults back afterwards, so the tracked project and Info.plist stay
+the floppy ones. The simulator build is optimised (Release), because the CD's
+video decoding is far too slow otherwise. `DUNE_CD=1 scripts/sim_run.sh ...`
+runs the CD app in the simulator.
+
+What the CD adds (ported from the Desert Frost engine, as the file headers say):
+
+- `Engine/Resources/DuneArchive.swift`: files are read from `DUNE.DAT` when
+  there are no loose files; the CD font is `DNCHAR.BIN`.
+- `Engine/Resources/HnmPlayer.swift`: the HNM clips. Outdoor places use the
+  last frame of their arrival clip as the backdrop (for example `PALACE.HNM`
+  under the `SKYDN` day palette), and outdoor rooms use sheet slot 0.
+- Travel: the MNT1-4 flight clips, chosen by the terrain the route crosses
+  (sand, rock canyons), with the minimap and the panel colours of the CD, then
+  the approach clip of the destination (`SIET.HNM` and the others). The CD does
+  not load `DUNES.HSQ`; the floppy keeps its perspective landscape.
+
 ## Input mapping
 
 | Touch / key | Game input |

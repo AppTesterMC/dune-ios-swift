@@ -48,10 +48,7 @@ final class SaveGame {
         if let data = try? Data(contentsOf: documentsURL(slot)) {
             return [UInt8](data)
         }
-        let name = fileName(slot) as NSString
-        if let url = Bundle.main.url(forResource: name.deletingPathExtension, withExtension: name.pathExtension,
-                                     subdirectory: "DuneFiles"),
-           let data = try? Data(contentsOf: url) {
+        if let path = DuneArchive.path(fileName(slot)), let data = try? Data(contentsOf: URL(fileURLWithPath: path)) {
             return [UInt8](data)
         }
         return nil

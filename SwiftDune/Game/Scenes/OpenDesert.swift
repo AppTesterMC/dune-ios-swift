@@ -176,3 +176,42 @@ final class ScenePicture: DuneNode {
         }
     }
 }
+
+
+/// The CD's arrival (travel_arrival_landing_sequence, seg000:488a): the
+/// place kind's approach clip to its end, coloured by SKYDN.HSQ's record of
+/// the hour; a tap skips it (the Game polls `finished`).
+final class VideoClip: DuneNode {
+    private var player: HnmPlayer?
+    private var clock: TimeInterval = 0
+    private var lightMode: DuneLightMode = .day
+    private(set) var finished = true
+
+    init() {
+        super.init("VideoClip")
+    }
+
+    override func onParamsChange() {
+        guard let name = params["name"] as? String else { return }
+        lightMode = params["lightMode"] as? DuneLightMode ?? .day
+        player = HnmPlayer(name)
+        finished = player == nil || !(player?.step() ?? false)
+        clock = 0
+    }
+
+    func skip() { finished = true }
+
+    override func update(_ elapsedTime: TimeInterval) {
+        guard let player = player, !finished else { return }
+        clock += elapsedTime
+        while clock >= 0.083 && !finished {
+            clock -= 0.083
+            if !player.step() { finished = true }
+        }
+    }
+
+    override func render(_ buffer: PixelBuffer) {
+        HnmPlayer.applySkyRecord(for: lightMode)
+        player?.draw(buffer, rows: 152)
+    }
+}

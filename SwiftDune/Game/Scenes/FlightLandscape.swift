@@ -103,26 +103,52 @@ final class FlightLandscape: DuneNode {
         [-1200, -500, 300, 700], [-1000, -50, 500, 1000], [-700, -150, 50, 800], [-1100, -350, 350, 600]
     ]
 
-    /// The route: position (longitude, latitude * 256), heading 0-255 and
-    /// the destination it homes on.
+    /// The route (ds:4 / ds:6): position, the row fraction (0x80 at
+    /// take-off), the heading 0-255 and the destination it homes on.
     private var longitude: UInt16 = 0
-    private var latitudeFix = 0
+    private var latitude: Int16 = 0
+    private var fraction: UInt8 = 0x80
     private var heading: UInt8 = 0
-    private var destination: (longitude: UInt16, latitude: Int) = (0, 0)
+    private var destination: (longitude: UInt16, latitude: Int16) = (0, 0)
     private var seed: UInt16 = 0
     private var terrain: UInt8 = 0
     private var frameClock: TimeInterval = 0
-    private var frameCount = 0
+    /// Frames until the next travel step (0 right after the fill).
+    private var stepCountdown = 0
+    /// Travel steps flown, and whether the route reached its destination cell.
+    private(set) var steps = 0
+    private(set) var arrived = false
     var dayMode: DuneLightMode = .day
+
+    // The CD's flight view (travel_select_flight_video, seg000:4ec6): the
+    // clips MNT1 sand, MNT2 sand to rock, MNT3 rock, MNT4 rock to sand, the
+    // next one chosen from the terrain ahead when a clip ends; no DUNES
+    // landscape. One travel step every 0x300 ticks (3.83 s).
+    private let isCD = !World.shared.isFloppy
+    private var clips: [HnmPlayer] = []
+    private var clip = 0
+    private var clipClock: TimeInterval = 0
+    private var stepClock: TimeInterval = 0
+    static let cdStepSeconds = 3.834
+    private static let clipFrameSeconds = 0.083   // the HNM frame time without a soundtrack
 
     init() {
         super.init("FlightLandscape")
     }
 
     override func onEnable() {
+        if isCD {
+            clips = ["MNT1.HNM", "MNT2.HNM", "MNT3.HNM", "MNT4.HNM"].compactMap { HnmPlayer($0) }
+            clip = 0
+            clips.first?.begin()
+            clips.first?.step()
+        }
         sky = Sky()
-        dunesData = Resource("DUNES.HSQ").unpackedData
-        dunesSprite = Sprite("DUNES.HSQ")
+        if !isCD {
+            // The floppy's landscape sheet (the CD has none: it plays MNT clips).
+            dunesData = Resource("DUNES.HSQ").unpackedData
+            dunesSprite = Sprite("DUNES.HSQ")
+        }
         onmap = Sprite("ONMAP.HSQ")
         icons = Sprite("ICONES.HSQ")
     }
@@ -130,6 +156,7 @@ final class FlightLandscape: DuneNode {
     override func onDisable() {
         sky = nil
         dunesSprite = nil
+        clips = []
         onmap = nil
         icons = nil
         objects = []
@@ -141,41 +168,128 @@ final class FlightLandscape: DuneNode {
         guard let from = params["from"] as? (UInt16, Int), let to = params["to"] as? (UInt16, Int) else { return }
         if let mode = params["dayMode"] as? DuneLightMode { dayMode = mode }
         longitude = from.0
-        latitudeFix = from.1 * 256 + 128
-        destination = (to.0, to.1)
-        heading = headingTo(longitude, latitudeFix >> 8, destination.longitude, destination.latitude)
-        start()
+        latitude = Int16(truncatingIfNeeded: from.1)
+        fraction = 0x80
+        destination = (to.0, Int16(truncatingIfNeeded: to.1))
+        steps = 0
+        arrived = false
+        trail = []
+        // Take-off: the first travel step, then the fill (floppy 4F63, 76CA).
+        step()
+        if isCD {
+            stepClock = 0
+            clipClock = 0
+        } else {
+            start()
+        }
     }
 
 
-    // MARK: The route (floppy 5FB7)
+    // MARK: The route (travel_step_position 7E87, compass 7DB4, heading 7E19)
 
-    private func rowUnits(_ latitude: Int) -> Double { 65536.0 / Double(max(1, world.rowCells(latitude))) }
-
-    private func headingTo(_ fromLng: UInt16, _ fromLat: Int, _ toLng: UInt16, _ toLat: Int) -> UInt8 {
-        let dx = Double(Int16(bitPattern: toLng &- fromLng)) / rowUnits(fromLat)
-        let dy = Double(toLat - fromLat)
-        if dx == 0 && dy == 0 { return heading }
-        var angle = atan2(dx, -dy) * 128.0 / Double.pi
-        if angle < 0 { angle += 256 }
-        return UInt8(Int(angle.rounded()) & 0xFF)
+    /// x86 idiv: the quotient truncated toward zero.
+    private static func truncDiv(_ a: Int, _ b: Int) -> Int {
+        let q = abs(a) / abs(b)
+        return (a >= 0) == (b > 0) ? q : -q
     }
 
-    /// One map cell along the heading: the major axis a whole cell, the
-    /// minor its share; over a pole the heading turns round.
-    private func advance(_ lng: inout UInt16, _ latFix: inout Int, _ head: inout UInt8) {
-        let row = latFix >> 8
-        let theta = Double(head) * Double.pi / 128.0
-        var sx = sin(theta), sy = -cos(theta)
-        let m = max(abs(sx), abs(sy))
-        sx /= m; sy /= m
-        lng = lng &+ UInt16(truncatingIfNeeded: Int((sx * rowUnits(row)).rounded()))
-        latFix += Int((sy * 256).rounded())
-        if abs(latFix >> 8) >= 0x60 {
-            latFix = (latFix > 0 ? 0x5F : -0x5F) * 256 + 128
+    /// ds:43C7: longitude units per map cell at a latitude.
+    private func unitsPerCell(_ latitude: Int) -> Int {
+        let cells = world.rowCells(latitude)
+        return cells > 0 ? (131072 + cells) / (2 * cells) : 65535
+    }
+
+    /// The compass (7DB4): the heading from one position to another, nil
+    /// when they coincide.
+    private func compassAngle(_ fromLng: UInt16, _ fromLat: Int16, _ toLng: UInt16, _ toLat: Int16) -> UInt8? {
+        var bx = Int(Int16(truncatingIfNeeded: Int(toLat) - Int(fromLat)))
+        var dx = Int(Int16(bitPattern: toLng &- fromLng))
+        if bx < -0x80 || bx >= 0x80 {
+            bx >>= 1
+            dx >>= 1
+        }
+        bx = Int(Int16(truncatingIfNeeded: (bx & 0xFF) << 8))
+        let ax = abs(bx), cx = abs(dx)
+        if cx >= ax {
+            guard cx >= 1 else { return nil }
+            let al = UInt8(truncatingIfNeeded: FlightLandscape.truncDiv(0x20 * bx, dx))
+            return dx >= 0 ? al &+ 0x40 : al &+ 0xC0
+        }
+        guard ax >= 1 else { return nil }
+        var al = UInt8(truncatingIfNeeded: FlightLandscape.truncDiv(0x20 * dx, bx))
+        if bx >= 0 { al = al &- 0x80 }
+        return 0 &- al
+    }
+
+    /// Homing (7E4C): aim at the destination from the current position.
+    private func aim() {
+        if let angle = compassAngle(longitude, latitude, destination.longitude, destination.latitude) {
+            heading = angle
+        }
+    }
+
+    /// travel_step_position (7E87): one map cell along the heading, the
+    /// major axis 0x20, the minor its in-octant share (7E19); the rows go
+    /// through the fraction; over a pole the heading turns round.
+    private func travelStep(_ lng: inout UInt16, _ lat: inout Int16, _ frac: inout UInt8, _ head: inout UInt8) {
+        var cdx: Int, cbx: Int
+        let bl = head &+ 0x20
+        if bl & 0x7F >= 0x40 {
+            var a = head &- 0x40
+            cdx = 0x20
+            if bl & 0x80 != 0 {
+                cdx = -0x20
+                a = 0 &- (a &- 0x80)
+            }
+            cbx = Int(Int8(bitPattern: a))
+        } else {
+            var a = head
+            cbx = -0x20
+            if bl & 0x80 != 0 {
+                a = 0 &- (a &- 0x80)
+                cbx = 0x20
+            }
+            cdx = Int(Int8(bitPattern: a))
+        }
+        let bp = unitsPerCell(Int(lat))
+        var lngDelta = FlightLandscape.truncDiv(bp * cdx, 0x20)
+        let latDelta = FlightLandscape.truncDiv(cbx * bp, 0x20)
+        var ax = abs(latDelta) + Int(frac)
+        if ax >> 8 > 1 {
+            lngDelta = FlightLandscape.truncDiv(lngDelta * 256, ax)
+            ax = 0x100
+        }
+        frac = UInt8(ax & 0xFF)
+        var rows = ax >> 8
+        if latDelta < 0 { rows = -rows }
+        lat = Int16(truncatingIfNeeded: Int(lat) + rows)
+        lng = lng &+ UInt16(truncatingIfNeeded: lngDelta)
+        if UInt16(bitPattern: lat &+ 0x60) >= 0xC0 {
             head = head &+ 0x80
             lng = lng &+ 0x8000
         }
+    }
+
+    /// A real travel step: re-aim, step, record the trail, check arrival.
+    private func step() {
+        guard !arrived else { return }
+        aim()
+        trail.append((longitude, Int(latitude)))
+        if trail.count > 23 { trail.removeFirst() }
+        travelStep(&longitude, &latitude, &fraction, &heading)
+        steps += 1
+        let here = world.mapCell(longitude: longitude, latitude: Int(latitude))
+        let there = world.mapCell(longitude: destination.longitude, latitude: Int(destination.latitude))
+        if here != nil && here == there { arrived = true }
+    }
+
+    /// The position `count` register-steps ahead (the fraction kept on a
+    /// copy, the heading aimed from the current position).
+    private func ahead(_ count: Int) -> (UInt16, Int16) {
+        var lng = longitude, lat = latitude, frac = fraction
+        var head = compassAngle(longitude, latitude, destination.longitude, destination.latitude) ?? heading
+        for _ in 0..<count { travelStep(&lng, &lat, &frac, &head) }
+        return (lng, lat)
     }
 
 
@@ -187,9 +301,9 @@ final class FlightLandscape: DuneNode {
     }
 
     /// 5963 / 5BF2: the seed and the terrain from a route position.
-    private func reseed(_ lng: UInt16, _ lat: Int) {
-        seed = lng ^ UInt16(truncatingIfNeeded: lat)
-        if let cell = world.mapCell(longitude: lng, latitude: lat), cell < world.map.count {
+    private func reseed(_ lng: UInt16, _ lat: Int16) {
+        seed = lng ^ UInt16(bitPattern: lat)
+        if let cell = world.mapCell(longitude: lng, latitude: Int(lat)), cell < world.map.count {
             terrain = world.map[cell]
         } else {
             terrain = 0
@@ -221,38 +335,74 @@ final class FlightLandscape: DuneNode {
         for x in xs { objects.append(Object(z: z, x: x, sprite: pick())) }
     }
 
-    /// The initial fill: five groups of 8 rows (z 1-40), each seeded from
-    /// the route one step further on.
+    /// The initial fill (76CA): five groups of 8 rows, group g at z
+    /// 1+8g...8+8g, seeded lng ^ lat at the position g steps ahead.
     private func start() {
         objects = []
-        var lng = longitude, latFix = latitudeFix, head = heading
         for g in 0..<5 {
-            reseed(lng, latFix >> 8)
+            let (lng, lat) = ahead(g)
+            reseed(lng, lat)
             for z in (1 + 8 * g)..<(9 + 8 * g) { emitRow(z) }
-            advance(&lng, &latFix, &head)
         }
         frameClock = 0
-        frameCount = 0
+        stepCountdown = 0
     }
 
-    /// One frame of 54ED: every object one step nearer, a new row at z 40;
-    /// every 8 frames a travel step, and the rows then come from 5 steps on.
+    /// One frame (54ED): every object one step nearer (gone at 0), a row at
+    /// z 40 with the current seed; then, every 8 frames starting with the
+    /// first, a travel step and a reseed 5 steps ahead of the new position.
     private func tick() {
         objects = objects.compactMap { o in o.z > 1 ? Object(z: o.z - 1, x: o.x, sprite: o.sprite) : nil }
         emitRow(FlightLandscape.far)
-        frameCount += 1
-        if frameCount % FlightLandscape.framesPerStep == 0 {
-            heading = headingTo(longitude, latitudeFix >> 8, destination.longitude, destination.latitude)
-            trail.append((longitude, latitudeFix >> 8))
-            if trail.count > 23 { trail.removeFirst() }
-            advance(&longitude, &latitudeFix, &heading)
-            var lng = longitude, latFix = latitudeFix, head = heading
-            for _ in 0..<5 { advance(&lng, &latFix, &head) }
-            reseed(lng, latFix >> 8)
+        if stepCountdown == 0 {
+            step()
+            let (lng, lat) = ahead(5)
+            reseed(lng, lat)
+            stepCountdown = FlightLandscape.framesPerStep
+        }
+        stepCountdown -= 1
+    }
+
+    /// The terrain ahead for the CD's clip choice: the mean of the current
+    /// cell's and the cell 6 steps ahead's heights (ScummVM drawCdFlightView).
+    private func terrainAhead() -> Int {
+        let (lng, lat) = ahead(6)
+        func height(_ lng: UInt16, _ lat: Int16) -> Int {
+            guard let c = world.mapCell(longitude: lng, latitude: Int(lat)), c < world.map.count else { return 0 }
+            return Int(world.map[c] & 0x0F)
+        }
+        return (height(longitude, latitude) + height(lng, lat)) / 2
+    }
+
+    private func nextClip() {
+        let rock = terrainAhead() >= 8
+        if !rock {
+            clip = clip == 0 ? 0 : (clip == 1 || clip == 2) ? 3 : 0
+        } else {
+            clip = (clip == 0 || clip == 3) ? 1 : 2
+        }
+        clips[clip].begin()
+        clips[clip].step()
+    }
+
+    private func updateCD(_ elapsedTime: TimeInterval) {
+        clipClock += elapsedTime
+        while clipClock >= FlightLandscape.clipFrameSeconds && !clips.isEmpty {
+            clipClock -= FlightLandscape.clipFrameSeconds
+            if !clips[clip].step() { nextClip() }
+        }
+        stepClock += elapsedTime
+        while stepClock >= FlightLandscape.cdStepSeconds {
+            stepClock -= FlightLandscape.cdStepSeconds
+            step()
         }
     }
 
     override func update(_ elapsedTime: TimeInterval) {
+        if isCD {
+            updateCD(elapsedTime)
+            return
+        }
         frameClock += elapsedTime
         var n = 0
         while frameClock >= FlightLandscape.frameSeconds && n < 40 {
@@ -304,7 +454,7 @@ final class FlightLandscape: DuneNode {
     /// with a 0xFA frame, the trail (ICONES 0x2F) and Paul (0x30).
     private func drawMinimap(_ buffer: PixelBuffer) {
         let renderer = world.mapRenderer
-        let lat = latitudeFix >> 8
+        let lat = Int(latitude)
         let viewLat = min(max(lat - 18, -75), 75)
         fullMap.clearBuffer()
         renderer.draw(fullMap, latitude: viewLat, longitude: longitude)
@@ -336,7 +486,18 @@ final class FlightLandscape: DuneNode {
     }
 
 
+    private func renderCD(_ buffer: PixelBuffer) {
+        onmap?.setPalette()                                // the minimap's colours first
+        HnmPlayer.applySkyRecord(for: dayMode)             // then SKYDN's record over them
+        if !clips.isEmpty { clips[clip].draw(buffer, rows: 152) }
+        drawMinimap(buffer)
+    }
+
     override func render(_ buffer: PixelBuffer) {
+        if isCD {
+            renderCD(buffer)
+            return
+        }
         guard let sky = sky else { return }
         // ONMAP's palette under the sky's: the minimap's terrain (0x10-0x1F).
         onmap?.setPalette()

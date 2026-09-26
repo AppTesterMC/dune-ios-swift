@@ -40,7 +40,9 @@ final class GameFont {
     var paletteIndex: UInt8 = 128
     
     init() {
-        self.resource = Resource("DUNECHAR.HSQ")
+        // The CD keeps the same font as DNCHAR.BIN (the ScummVM engine's
+        // Panel loads it first).
+        self.resource = DuneArchive.isCD ? Resource("DNCHAR.BIN", uncompressed: true) : Resource("DUNECHAR.HSQ")
 
         resource.stream!.seek(0)
         self.charWidths = resource.stream!.readBytes(256)

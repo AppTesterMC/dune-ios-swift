@@ -58,10 +58,12 @@ final class Game: DuneNode {
     private var mapActive = false
     /// The floppy's travel step: 8 landscape frames of 16 ticks (640 ms);
     /// the CD's is 0x300 ticks (3.83 s).
-    private static let stepSeconds = 0.64
+    private static var stepSeconds: Double { World.shared.isFloppy ? 0.64 : FlightLandscape.cdStepSeconds }
     /// Flying to a place (index) or to a desert point (-1): arrival time.
     private var flight: (destination: Int, cells: Int, arrival: TimeInterval)?
     private var flightPoint: (latitude: Int, longitude: UInt16)?
+    /// CD: the arrival clip is playing (a tap skips it).
+    private var arrivalClip = false
     private var clock: TimeInterval = 0
     /// Paul in the open desert (ds:8 = 0xFF).
     private var inDesert = false
@@ -155,7 +157,10 @@ final class Game: DuneNode {
             "sheet": world.sheet(for: record),
             "people": world.peopleInRoom(),
             "salFile": World.salFile(world.placeType),
-            "outdoor": world.isOutdoors(record, placeType: world.placeType)
+            "outdoor": world.isOutdoors(record, placeType: world.placeType),
+            // CD: outdoor rooms (not the palace balcony, SAL 10) are the
+            // arrival clip's last picture (ScummVM composeView).
+            "videoBackdrop": cdVideoBackdrop(record) as Any
         ]
         var params = roomParams
         if let dialogueCharacter = dialogueCharacter {
@@ -176,9 +181,17 @@ final class Game: DuneNode {
     }
 
 
+    private func cdVideoBackdrop(_ record: RoomRecord) -> String? {
+        guard !world.isFloppy, world.isOutdoors(record, placeType: world.placeType),
+              !(world.placeType == Location.palace && record.salRoom == 10) else { return nil }
+        return World.arrivalVideo(world.placeType)
+    }
+
     /// Shows wherever the data segment says Paul is (new game or a load).
     func showCurrentPlace() {
-        if world.placeType <= Location.sietchMax && world.currentRoomRecord() != nil {
+        // The floppy's Sietch node draws SIET0/SIET1; the CD has no SIET0,
+        // so its sietches use the generic room view (Palace node, SIET.SAL).
+        if world.isFloppy && world.placeType <= Location.sietchMax && world.currentRoomRecord() != nil {
             if findNode("Sietch") == nil {
                 attachNode(Sietch())
             }
@@ -419,13 +432,13 @@ final class Game: DuneNode {
     /// Land: the place is discovered, Paul in its room 1 with one more
     /// ornithopter, a period per 16 cells has passed, then the room-entry
     /// lines.
-    private func arrive() {
+    private func arrive(periods: Int? = nil) {
         guard let trip = flight else { return }
         flight = nil
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
         setNodeActive("FlightLandscape", false)
-        gameState.passPeriods(trip.cells / 16)
+        gameState.passPeriods(periods ?? trip.cells / 16) // a period every 16 steps
         if trip.destination < 0, let point = flightPoint {
             landInDesert(point)
             return
@@ -433,12 +446,21 @@ final class Game: DuneNode {
         world.discover(trip.destination)
         world.setPosition(location: trip.destination, room: 1)
         if !riding { world.adjustOrnithopters(trip.destination, 1) }
+        let wasRiding = riding
         riding = false
         gameState.setLocation(trip.destination)
         engine.logger.log(.info, "Flight: landed at \(trip.destination) (\(world.locationName(trip.destination, GameText.shared.command)))")
         // location_related_to_dying_if_arriving_at_fortress (seg000:503c):
         // a place in battle takes Paul into it; a hostile one shoots him.
         if world.nightAttackCheck(at: trip.destination) == .shot { return }
+        if !world.isFloppy && !wasRiding {
+            // CD: the approach clip first; the place when it ends.
+            if findNode("VideoClip") == nil { attachNode(VideoClip()) }
+            setNodeActive("VideoClip", true, .background)
+            findNode("VideoClip")?.params = ["name": World.arrivalVideo(world.placeType), "lightMode": gameState.phase.lightMode]
+            arrivalClip = true
+            return
+        }
         showCurrentPlace()
         roomEntryScan()
     }
@@ -1496,8 +1518,20 @@ final class Game: DuneNode {
             gameState.advance(elapsedTime)
         }
         clock += elapsedTime
-        if let flight = flight, clock >= flight.arrival {
-            arrive()
+        if let flight = flight {
+            // The route lands when its cell is the destination's (the
+            // landscape flies it); the timer stays as a fallback.
+            if let landscape = findNode("FlightLandscape") as? FlightLandscape, landscape.isActive, landscape.arrived {
+                arrive(periods: landscape.steps / 16)
+            } else if clock >= flight.arrival + 10 {
+                arrive()
+            }
+        }
+        if arrivalClip, let clip = findNode("VideoClip") as? VideoClip, clip.finished {
+            arrivalClip = false
+            setNodeActive("VideoClip", false)
+            showCurrentPlace()
+            roomEntryScan()
         }
         checkIdle(elapsedTime)
         updateMusic()
@@ -1707,6 +1741,10 @@ final class Game: DuneNode {
 
     override func onClick(_ event: DuneMouseClickEvent) {
         idleTime = 0
+        if arrivalClip {
+            (findNode("VideoClip") as? VideoClip)?.skip()
+            return
+        }
         if sceneActive && sceneWaiting && !isOverlayActive("Dialogue") {
             sceneWaiting = false
             sceneStep() // " Continue..."
@@ -2080,6 +2118,7 @@ final class Game: DuneNode {
     private func moveRoom(_ direction: RoomDirection) {
         dialogueCharacter = nil
         guard let exits = world.currentRoomRecord()?.exits else { return }
+        engine.logger.log(.info, "Room: move \(direction) from room \(world.room) -> exit \(exits[direction.rawValue])")
 
         switch RoomRecord.decode(exits[direction.rawValue]) {
         case .room(let room):
