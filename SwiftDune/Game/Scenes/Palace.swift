@@ -314,6 +314,11 @@ final class Palace: DuneNode {
         } else if videoBackdrop != nil {
             // CD: SKYDN.HSQ's record of the hour colours the clip (73-239),
             // then the interface's colours over it (PERS: 1-15, 224-239).
+            // The sky's interface tail first (240-254: the blue-grey panel of
+            // outdoor rooms, as the CD playthrough's entrances show), then
+            // SKYDN's record over 73-239, then PERS.
+            sky.lightMode = GameState.shared.phase.lightMode
+            sky.setPalette(gameplayPalette: true)
             HnmPlayer.applySkyRecord(for: GameState.shared.phase.lightMode)
             palaceScenery.setCharacterPalette()
         } else if isGameplayExterior {
