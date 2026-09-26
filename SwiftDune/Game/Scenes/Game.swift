@@ -1853,7 +1853,8 @@ final class Game: DuneNode {
             return
         }
 
-        if dialogueCharacter != nil {
+        // A talk, or the COMM room's message list (no speaker yet).
+        if dialogueCharacter != nil || dialogueContext == .comm {
             if menuRect.contains(event.point) {
                 handleDialogueMenuClick(event.point)
             }
