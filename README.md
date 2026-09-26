@@ -30,7 +30,9 @@ The Mac app and the asset editor from the original project still build.
 ## Status
 
 This is a development port, not a finished release. It targets the **DOS
-floppy release**; the CD release is detected but not playable yet.
+floppy release**; the **CD release** plays too (`scripts/build_ios.sh --cd`,
+with `DUNE.DAT` and `DNCDPRG.EXE` in `DuneFilesCD/`): its video flight view,
+arrival clips and rendered backdrops, but not yet its intro.
 
 | Area | State |
 | --- | --- |
@@ -48,7 +50,7 @@ floppy release**; the CD release is detected but not playable yet.
 | Music | the original's song per situation (palace, sietches, map, globe, talks, travel, endings) |
 | Battles, worms, troop moves, ecology | the rules are ported (marches, espionage, fort battles, MASSIVE ATTACK, worm riding, vegetation); their animations are not |
 | Endings | shown as text on black |
-| Not yet | the troop contact popup and MODIFY EQUIPMENT, battle and worm animations, the mirror, Harkonnen raids, the CD release |
+| Not yet | the troop contact popup and MODIFY EQUIPMENT, battle and worm animations, the mirror, Harkonnen raids, the CD intro |
 
 [`SCUMMVM_GAP_ANALYSIS.md`](SCUMMVM_GAP_ANALYSIS.md) lists in detail what the
 ScummVM engine already has and this port still lacks; [`TODO.md`](TODO.md)
