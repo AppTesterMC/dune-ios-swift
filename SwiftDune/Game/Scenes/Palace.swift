@@ -41,6 +41,8 @@ final class Palace: DuneNode {
     private var salFile = "PALACE.SAL"
     /// Set by the game from World.isOutdoors; nil = the palace's own rule.
     private var outdoor: Bool?
+    /// CD: the arrival clip whose last frame is this outdoor room's backdrop.
+    private var videoBackdrop: String?
     /// Sheet from the room code (World.sheet(for:)); nil = legacy ranges.
     private var sheet: String?
     /// Character numbers in the room; placed with World.markerAssignment.
@@ -102,6 +104,7 @@ final class Palace: DuneNode {
         markers = [:]
         salFile = "PALACE.SAL"
         outdoor = nil
+        videoBackdrop = nil
         sheet = nil
         people = nil
         cast = nil
@@ -146,6 +149,10 @@ final class Palace: DuneNode {
         }
         if params.keys.contains("outdoor") {
             outdoor = params["outdoor"] as? Bool
+        }
+        if params.keys.contains("videoBackdrop") {
+            videoBackdrop = params["videoBackdrop"] as? String
+            contextBuffer.tag = 0
         }
 
         if params.keys.contains("sheet") {
@@ -240,9 +247,15 @@ final class Palace: DuneNode {
         if isGameplayExterior || (gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony)) {
             // Cache per room and sky: re-draw when the period's sky changes.
             let tag = 0x0100 | UInt32(roomIndex) << 4 | sky.lightMode.asInt | (inPalace ? 0 : 0x1000)
+                | (videoBackdrop != nil ? 0x2000 : 0)
             if contextBuffer.tag != tag {
                 contextBuffer.clearBuffer()
-                if gameRoomID != nil && inPalace && roomIndex == 11 {
+                if let name = videoBackdrop, let frame = HnmPlayer.lastFrame(name) {
+                    // CD: the arrival clip's last picture (drawVideoBackdrop).
+                    for y in 0..<min(152, contextBuffer.height) {
+                        for x in 0..<320 { contextBuffer.rawPointer[y * contextBuffer.width + x] = frame[y * 320 + x] }
+                    }
+                } else if gameRoomID != nil && inPalace && roomIndex == 11 {
                     // The palace front (SAL room 11) uses the large sky, 200 px.
                     sky.render(contextBuffer, width: 200, at: 0, type: .large, gameplayPalette: true)
                 } else {
@@ -298,6 +311,9 @@ final class Palace: DuneNode {
         // balcony seen after room changes.
         if gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony || currentRoom == .stairs) {
             sky.setPalette()
+        } else if videoBackdrop != nil {
+            // CD: SKYDN.HSQ's record of the hour colours the clip (73-239).
+            HnmPlayer.applySkyRecord(for: GameState.shared.phase.lightMode)
         } else if isGameplayExterior {
             // Outdoor sheets have no palette of their own for 128-222: they
             // use the sky's, for the current period (FINDINGS, room drawing).

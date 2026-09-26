@@ -15,6 +15,12 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 run="$1"; seconds="$2"; shift 2
 bundle=com.apptestermc.swiftdune
+# DUNE_CD=1 runs the CD release (scripts/build_ios.sh --cd).
+build_args=(sim)
+if [[ "${DUNE_CD:-0}" == 1 ]]; then
+  bundle=com.apptestermc.swiftdune.cd
+  build_args+=(--cd)
+fi
 
 cd "$repo_root"
 
@@ -37,7 +43,7 @@ print "simulator runtime: $runtime"
 sim=$(cat $udid_file)
 xcrun simctl boot $sim 2>/dev/null || true
 
-app=$(scripts/build_ios.sh sim | sed -n 's/^APP=//p')
+app=$(scripts/build_ios.sh "${build_args[@]}" | sed -n 's/^APP=//p')
 xcrun simctl terminate $sim $bundle 2>/dev/null || true
 timeout 120 xcrun simctl install $sim "$app"
 

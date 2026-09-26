@@ -3,6 +3,8 @@
 #
 #   scripts/build_ios.sh            # device IPA -> builds/SwiftDune-ios-<stamp>.ipa
 #   scripts/build_ios.sh sim        # simulator .app, printed as APP=...
+#   add --cd to either for the CD release: DuneFilesCD/ (DUNE.DAT and
+#   DNCDPRG.EXE) is bundled instead of DuneFiles/, as the app "Dune CD"
 #
 # Builds from this local checkout (~/dune-ios-swift), never from /Volumes:
 # the SMB volume disconnects and /private/tmp is wiped on reset. Derived data
@@ -15,7 +17,20 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 stamp="$(date +%Y%m%d-%H%M%S)"
 derived="$repo_root/build/derived"
-mode="${1:-device}"
+mode=device
+cd_release=0
+for argument in "$@"; do
+  case "$argument" in
+    sim) mode=sim ;;
+    --cd) cd_release=1 ;;
+  esac
+done
+if (( cd_release )); then
+  export DUNE_DATA=DuneFilesCD DUNE_APP_NAME="Dune CD" DUNE_BUNDLE_ID=com.apptestermc.swiftdune.cd
+  derived="$repo_root/build/derived-cd"
+else
+  export DUNE_DATA=DuneFiles DUNE_APP_NAME=Dune DUNE_BUNDLE_ID=com.apptestermc.swiftdune
+fi
 
 cd "$repo_root"
 xcodegen generate --spec project-ios.yml --quiet
@@ -45,7 +60,7 @@ cp -R "$app" "$stage/Payload/Dune.app"
 codesign --force --deep --sign - --timestamp=none "$stage/Payload/Dune.app"
 codesign --verify --deep --strict "$stage/Payload/Dune.app"
 
-ipa="$repo_root/builds/SwiftDune-ios-$stamp.ipa"
+ipa="$repo_root/builds/SwiftDune-ios$( (( cd_release )) && print -- -cd)-$stamp.ipa"
 ditto -c -k --sequesterRsrc --keepParent "$stage/Payload" "$ipa"
 rm -rf "$stage"
 print "IPA=$ipa"

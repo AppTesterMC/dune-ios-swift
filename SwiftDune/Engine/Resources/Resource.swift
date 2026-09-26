@@ -458,7 +458,8 @@ final class Resource
         let fileNameWithoutExtension = String(fileComponents[0])
         let fileExtension = String(fileComponents[1])
 
-        guard let filePath = Bundle.main.path(forResource: fileNameWithoutExtension, ofType: fileExtension, inDirectory: "DuneFiles") else {
+        _ = (fileNameWithoutExtension, fileExtension)
+        guard let filePath = DuneArchive.path(fileName) else {
             engine.logger.log(.error, "\(fileName): not found.")
             return
         }
@@ -497,7 +498,7 @@ final class Resource
             return
         }
 
-        guard let filePath = Bundle.main.path(forResource: fileName.replacingOccurrences(of: ".\(fileExtension)", with: ""), ofType: fileExtension, inDirectory: "DuneFiles") else {
+        guard let filePath = DuneArchive.path(fileName) else {
             engine.logger.log(.error, "\(fileName): not found.")
             return
         }

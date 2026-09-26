@@ -120,11 +120,29 @@ final class FlightLandscape: DuneNode {
     private(set) var arrived = false
     var dayMode: DuneLightMode = .day
 
+    // The CD's flight view (travel_select_flight_video, seg000:4ec6): the
+    // clips MNT1 sand, MNT2 sand to rock, MNT3 rock, MNT4 rock to sand, the
+    // next one chosen from the terrain ahead when a clip ends; no DUNES
+    // landscape. One travel step every 0x300 ticks (3.83 s).
+    private let isCD = !World.shared.isFloppy
+    private var clips: [HnmPlayer] = []
+    private var clip = 0
+    private var clipClock: TimeInterval = 0
+    private var stepClock: TimeInterval = 0
+    static let cdStepSeconds = 3.834
+    private static let clipFrameSeconds = 0.083   // the HNM frame time without a soundtrack
+
     init() {
         super.init("FlightLandscape")
     }
 
     override func onEnable() {
+        if isCD {
+            clips = ["MNT1.HNM", "MNT2.HNM", "MNT3.HNM", "MNT4.HNM"].compactMap { HnmPlayer($0) }
+            clip = 0
+            clips.first?.begin()
+            clips.first?.step()
+        }
         sky = Sky()
         dunesData = Resource("DUNES.HSQ").unpackedData
         dunesSprite = Sprite("DUNES.HSQ")
@@ -135,6 +153,7 @@ final class FlightLandscape: DuneNode {
     override func onDisable() {
         sky = nil
         dunesSprite = nil
+        clips = []
         onmap = nil
         icons = nil
         objects = []
@@ -154,7 +173,12 @@ final class FlightLandscape: DuneNode {
         trail = []
         // Take-off: the first travel step, then the fill (floppy 4F63, 76CA).
         step()
-        start()
+        if isCD {
+            stepClock = 0
+            clipClock = 0
+        } else {
+            start()
+        }
     }
 
 
@@ -336,7 +360,46 @@ final class FlightLandscape: DuneNode {
         stepCountdown -= 1
     }
 
+    /// The terrain ahead for the CD's clip choice: the mean of the current
+    /// cell's and the cell 6 steps ahead's heights (ScummVM drawCdFlightView).
+    private func terrainAhead() -> Int {
+        let (lng, lat) = ahead(6)
+        func height(_ lng: UInt16, _ lat: Int16) -> Int {
+            guard let c = world.mapCell(longitude: lng, latitude: Int(lat)), c < world.map.count else { return 0 }
+            return Int(world.map[c] & 0x0F)
+        }
+        return (height(longitude, latitude) + height(lng, lat)) / 2
+    }
+
+    private func nextClip() {
+        let rock = terrainAhead() >= 8
+        if !rock {
+            clip = clip == 0 ? 0 : (clip == 1 || clip == 2) ? 3 : 0
+        } else {
+            clip = (clip == 0 || clip == 3) ? 1 : 2
+        }
+        clips[clip].begin()
+        clips[clip].step()
+    }
+
+    private func updateCD(_ elapsedTime: TimeInterval) {
+        clipClock += elapsedTime
+        while clipClock >= FlightLandscape.clipFrameSeconds && !clips.isEmpty {
+            clipClock -= FlightLandscape.clipFrameSeconds
+            if !clips[clip].step() { nextClip() }
+        }
+        stepClock += elapsedTime
+        while stepClock >= FlightLandscape.cdStepSeconds {
+            stepClock -= FlightLandscape.cdStepSeconds
+            step()
+        }
+    }
+
     override func update(_ elapsedTime: TimeInterval) {
+        if isCD {
+            updateCD(elapsedTime)
+            return
+        }
         frameClock += elapsedTime
         var n = 0
         while frameClock >= FlightLandscape.frameSeconds && n < 40 {
@@ -420,7 +483,18 @@ final class FlightLandscape: DuneNode {
     }
 
 
+    private func renderCD(_ buffer: PixelBuffer) {
+        onmap?.setPalette()                                // the minimap's colours first
+        HnmPlayer.applySkyRecord(for: dayMode)             // then SKYDN's record over them
+        if !clips.isEmpty { clips[clip].draw(buffer, rows: 152) }
+        drawMinimap(buffer)
+    }
+
     override func render(_ buffer: PixelBuffer) {
+        if isCD {
+            renderCD(buffer)
+            return
+        }
         guard let sky = sky else { return }
         // ONMAP's palette under the sky's: the minimap's terrain (0x10-0x1F).
         onmap?.setPalette()

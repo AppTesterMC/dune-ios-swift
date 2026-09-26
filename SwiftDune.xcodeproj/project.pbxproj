@@ -69,6 +69,8 @@
 		0699D2772A93C702006287E0 /* Resource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D2762A93C702006287E0 /* Resource.swift */; };
 		0699D27E2A93D245006287E0 /* DuneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D27D2A93D245006287E0 /* DuneEngine.swift */; };
 		FD54F887CC1F14A06117DB51 /* DevHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */; };
+		137C656E1C10D8AFD562B6E7 /* HnmPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB974AF7716DA11BF26A80E /* HnmPlayer.swift */; };
+		8BFBB11843EA99B758862068 /* DuneArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F39E0C883ED1008F73BFF11 /* DuneArchive.swift */; };
 		994CFC1318A73E359E059BA4 /* FlightLandscape.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54E7D6FC36CFC4F1A62FD98 /* FlightLandscape.swift */; };
 		809559769D4DCE838296027B /* Ecology.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CA3EE7BD427EBDF2D0C228 /* Ecology.swift */; };
 		991EC9A5B25F28F90CE72581 /* Battles.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD6518C5BAD976775BF2EBAD /* Battles.swift */; };
@@ -129,6 +131,8 @@
 		06CA2BBE2C7B350F00B47D13 /* Globe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06DC67A22BE2320B0067DFEA /* Globe.swift */; };
 		06CA2BBF2C7B350F00B47D13 /* DuneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0699D27D2A93D245006287E0 /* DuneEngine.swift */; };
 		EE378917B4B4C3E7EAADEF81 /* DevHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */; };
+		782C0D64CF81AF150C8BC1C7 /* HnmPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB974AF7716DA11BF26A80E /* HnmPlayer.swift */; };
+		55BAC216A51AD8245A0BA995 /* DuneArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F39E0C883ED1008F73BFF11 /* DuneArchive.swift */; };
 		14444848CEDB8881ACA29CD0 /* FlightLandscape.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54E7D6FC36CFC4F1A62FD98 /* FlightLandscape.swift */; };
 		3C34E941A531CC6F7F57D0FB /* Ecology.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6CA3EE7BD427EBDF2D0C228 /* Ecology.swift */; };
 		D528FFDEE8FEB4D07046969C /* Battles.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD6518C5BAD976775BF2EBAD /* Battles.swift */; };
@@ -224,6 +228,8 @@
 		0699D2762A93C702006287E0 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
 		0699D27D2A93D245006287E0 /* DuneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneEngine.swift; sourceTree = "<group>"; };
 		5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevHarness.swift; sourceTree = "<group>"; };
+		EBB974AF7716DA11BF26A80E /* HnmPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Engine/Resources/HnmPlayer.swift; sourceTree = SOURCE_ROOT; };
+		5F39E0C883ED1008F73BFF11 /* DuneArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Engine/Resources/DuneArchive.swift; sourceTree = SOURCE_ROOT; };
 		E54E7D6FC36CFC4F1A62FD98 /* FlightLandscape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/Scenes/FlightLandscape.swift; sourceTree = SOURCE_ROOT; };
 		A6CA3EE7BD427EBDF2D0C228 /* Ecology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/Ecology.swift; sourceTree = SOURCE_ROOT; };
 		BD6518C5BAD976775BF2EBAD /* Battles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDune/Game/World/Battles.swift; sourceTree = SOURCE_ROOT; };
@@ -447,6 +453,8 @@
 				063549442B1D04E200885655 /* Resources */,
 				0699D27D2A93D245006287E0 /* DuneEngine.swift */,
 				5B84C3CD3345FCBCFCF893DC /* DevHarness.swift */,
+				EBB974AF7716DA11BF26A80E /* HnmPlayer.swift */,
+				5F39E0C883ED1008F73BFF11 /* DuneArchive.swift */,
 				E54E7D6FC36CFC4F1A62FD98 /* FlightLandscape.swift */,
 				A6CA3EE7BD427EBDF2D0C228 /* Ecology.swift */,
 				BD6518C5BAD976775BF2EBAD /* Battles.swift */,
@@ -662,6 +670,8 @@
 				06AB96D52BEB7DC300482823 /* Attack.swift in Sources */,
 				0699D27E2A93D245006287E0 /* DuneEngine.swift in Sources */,
 				FD54F887CC1F14A06117DB51 /* DevHarness.swift in Sources */,
+				137C656E1C10D8AFD562B6E7 /* HnmPlayer.swift in Sources */,
+				8BFBB11843EA99B758862068 /* DuneArchive.swift in Sources */,
 				994CFC1318A73E359E059BA4 /* FlightLandscape.swift in Sources */,
 				809559769D4DCE838296027B /* Ecology.swift in Sources */,
 				991EC9A5B25F28F90CE72581 /* Battles.swift in Sources */,
@@ -759,6 +769,8 @@
 				06CA2BBE2C7B350F00B47D13 /* Globe.swift in Sources */,
 				06CA2BBF2C7B350F00B47D13 /* DuneEngine.swift in Sources */,
 				EE378917B4B4C3E7EAADEF81 /* DevHarness.swift in Sources */,
+				782C0D64CF81AF150C8BC1C7 /* HnmPlayer.swift in Sources */,
+				55BAC216A51AD8245A0BA995 /* DuneArchive.swift in Sources */,
 				14444848CEDB8881ACA29CD0 /* FlightLandscape.swift in Sources */,
 				3C34E941A531CC6F7F57D0FB /* Ecology.swift in Sources */,
 				D528FFDEE8FEB4D07046969C /* Battles.swift in Sources */,

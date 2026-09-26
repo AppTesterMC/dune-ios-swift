@@ -212,15 +212,15 @@ final class Fresk: DuneNode {
         freskSprite.drawFrame(1, x: 214, y: 0, buffer: buffer)
 
         font.paletteIndex = 250
-        font.render(commands.sentence(at: 181), rect: DuneRect(72, 4, 176, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 182), rect: DuneRect(72, 18, 176, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 185), rect: DuneRect(48, 39, 224, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 186), rect: DuneRect(58, 53, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 187), rect: DuneRect(166, 53, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 188), rect: DuneRect(48, 72, 224, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 189), rect: DuneRect(58, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 190), rect: DuneRect(166, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(commands.sentence(at: 191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(181), rect: DuneRect(72, 4, 176, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(182), rect: DuneRect(72, 18, 176, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(185), rect: DuneRect(48, 39, 224, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(186), rect: DuneRect(58, 53, 96, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(187), rect: DuneRect(166, 53, 96, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(188), rect: DuneRect(48, 72, 224, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(189), rect: DuneRect(58, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(190), rect: DuneRect(166, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
+        font.render(GameText.shared.command(191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
 
         // Keep the source command strings above, but expose the live state
         // that the original results screen is driven by. This is intentionally

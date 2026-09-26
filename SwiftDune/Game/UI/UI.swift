@@ -252,7 +252,7 @@ final class UI: DuneNode {
             if i < menuItems.count {
                 let sentence = menuCaptions?.indices.contains(i) == true
                     ? menuCaptions![i]
-                    : commands.sentence(at: menuItems[i])
+                    : GameText.shared.command(Int(menuItems[i]))
                 font.paletteIndex = greyed ? 246 : i == selectedMenuIndex ? darkColorIndex : lightColorIndex
                 let row = font.fit(sentence, width: Int(menuItemTextRect.width) - 2, style: .small)
                 font.render(row, rect: menuItemTextRect, buffer: buffer, style: .small)
