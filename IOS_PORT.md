@@ -34,6 +34,10 @@ does not always resolve. The IPA is ad-hoc signed for sideloading; to run on
 your own device from Xcode instead, open `SwiftDuneiOS.xcodeproj` and pick your
 signing team. `scripts/build_ios.sh sim` builds for the simulator.
 
+The iOS app icon ships as plain PNGs (`SwiftDune/Platform/iOS/Icons`, listed
+under `CFBundleIcons`) rather than an asset catalog, because `actool` refuses
+to build a catalog without a simulator runtime that matches the SDK.
+
 ## Input mapping
 
 | Touch / key | Game input |
