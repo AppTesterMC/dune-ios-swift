@@ -42,8 +42,11 @@ floppy release**; the CD release is detected but not playable yet.
 | Globe and game menu | save and load in the original `DUNE21S?.SAV` format, options |
 | Troops | rallying Fremen, WORK FOR ME, occupations, spice mining and prospecting |
 | Clock and HUD | day and time of day, sun and moon, companions travelling with Paul |
-| Visions and the open desert | in play |
-| Not yet | the Emperor's shipments and the COMM room, scripted story scenes, troop marches, ecology, battles, worms, endings, music per place, the CD release |
+| Visions and the open desert | the first vision, dreams and messages in person |
+| The Emperor's shipments and the COMM room | demands, Duncan's bargaining, reminders, shipping from the COMM room, messages |
+| Scripted story scenes | the " Continue..." sequences read from the executable |
+| Endings | the Emperor's ending and the final cast list (text only) |
+| Not yet | troop marches, ecology, battles, worms, the other endings, music per place, the CD release |
 
 [`SCUMMVM_GAP_ANALYSIS.md`](SCUMMVM_GAP_ANALYSIS.md) lists in detail what the
 ScummVM engine already has and this port still lacks; [`TODO.md`](TODO.md)
