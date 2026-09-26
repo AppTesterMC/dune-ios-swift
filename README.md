@@ -45,8 +45,10 @@ floppy release**; the CD release is detected but not playable yet.
 | Visions and the open desert | the first vision, dreams and messages in person |
 | The Emperor's shipments and the COMM room | demands, Duncan's bargaining, reminders, shipping from the COMM room, messages |
 | Scripted story scenes | the " Continue..." sequences read from the executable |
-| Endings | the Emperor's ending and the final cast list (text only) |
-| Not yet | troop marches, ecology, battles, worms, the other endings, music per place, the CD release |
+| Music | the original's song per situation (palace, sietches, map, globe, talks, travel, endings) |
+| Battles, worms, troop moves, ecology | the rules are ported (marches, espionage, fort battles, MASSIVE ATTACK, worm riding, vegetation); their animations are not |
+| Endings | shown as text on black |
+| Not yet | the troop contact popup and MODIFY EQUIPMENT, battle and worm animations, the mirror, Harkonnen raids, the CD release |
 
 [`SCUMMVM_GAP_ANALYSIS.md`](SCUMMVM_GAP_ANALYSIS.md) lists in detail what the
 ScummVM engine already has and this port still lacks; [`TODO.md`](TODO.md)
