@@ -36,7 +36,9 @@ final class GameText {
     /// The COMMAND index whose text starts with `text` (the numbering
     /// differs between releases, so rows are looked up by text).
     func findCommand(_ text: String) -> Int? {
-        commandTexts.firstIndex { $0.hasPrefix(text) }
+        // Leading spaces differ between releases ("  Cancel", "Done").
+        let wanted = text.trimmingCharacters(in: .whitespaces)
+        return commandTexts.firstIndex { $0.trimmingCharacters(in: .whitespaces).hasPrefix(wanted) }
     }
 
     /// A phrase by 0-based index in PHRASEx1/PHRASEx2, codes expanded.

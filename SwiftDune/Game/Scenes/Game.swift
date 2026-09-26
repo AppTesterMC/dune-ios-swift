@@ -62,6 +62,10 @@ final class Game: DuneNode {
     private var clock: TimeInterval = 0
     /// Paul in the open desert (ds:8 = 0xFF).
     private var inDesert = false
+    /// CALL A WORM chose the map: the next trip rides a worm (no ornithopter).
+    private var riding = false
+    /// MOVE TROOP chose the map: the destination is the troop's (map "Done").
+    private var movingTroop: Int?
     /// How long Paul has waited in a room or the desert with nothing open
     /// (idle_room_message_check, seg000:2b2a); input resets it.
     private var idleTime: TimeInterval = 0
@@ -206,7 +210,8 @@ final class Game: DuneNode {
     }
 
     /// SEE DUNE MAP (caption: the DUNE MAP box) or leaving a place (select).
-    private func openMap(select: Bool, caption: Bool) {
+    private func openMap(select: Bool, caption: Bool, riding: Bool = false) {
+        self.riding = riding
         dialogueCharacter = nil
         mapActive = true
         let map = flatMap
@@ -217,11 +222,12 @@ final class Game: DuneNode {
 
     private func closeMap() {
         mapActive = false
+        movingTroop = nil
         setNodeActive("FlatMap", false)
         if inDesert { showDesert() } else { showCurrentPlace() }
     }
 
-    private enum MapRow { case exit, fly, orders, contact, density, takeOrnithopter, prospectors }
+    private enum MapRow { case exit, fly, worm, moveDone, orders, contact, density, takeOrnithopter, prospectors }
 
     /// map_setup_main_menu (seg000:878c): EXIT MAPS; GO THERE FLYING AN
     /// ORNI once a place is chosen; GIVE ORDERS TO TROOP within a contact
@@ -238,8 +244,16 @@ final class Game: DuneNode {
         let map = flatMap
         let phase = world.b(World.phase)
         add(.exit, "EXIT MAPS")
+        if let _ = movingTroop {
+            if map.destination != nil { add(.moveDone, "  Done") }
+            return rows
+        }
         if map.selecting, (map.destination.map { $0 != world.currentLocation || inDesert } ?? false) || map.point != nil {
-            add(.fly, "GO THERE FLYING AN ORNI")
+            add(.fly, riding ? "GO THERE RIDING A WORM" : "GO THERE FLYING AN ORNI")
+        } else if !map.selecting, let destination = map.destination, destination != world.currentLocation,
+                  world.canTravelByWorm {
+            // seg000:5ff9: once a worm was ridden the place's popup offers it.
+            add(.worm, "GO THERE RIDING A WORM")
         }
         if world.w(0x1176) < 2 {
             add(.orders, "GIVE ORDERS TO TROOP", world.localTroop(hired: true) == nil)
@@ -301,6 +315,18 @@ final class Game: DuneNode {
         case .density:
             map.density.toggle()
             publishMapUI()
+        case .worm:
+            if let destination = map.destination {
+                riding = true
+                fly(to: destination)
+            }
+        case .moveDone:
+            if let troop = movingTroop, let destination = map.destination {
+                let accepted = world.issueMoveOrder(troop: troop, to: destination)
+                engine.logger.log(.info, "Troops: troop \(troop) \(accepted ? "moves" : "refuses to move") to \(destination)")
+                movingTroop = nil
+                closeMap()
+            }
         case .prospectors:
             // Centre on the prospectors (troop 3); their contact popup is
             // not ported yet.
@@ -348,7 +374,9 @@ final class Game: DuneNode {
         setNodeActive("Sietch", false)
         setNodeActive("OpenDesert", false)
         sietchActive = false
-        if !inDesert {
+        if riding {
+            world.rideWorm() // no ornithopter; the first ride sets phase 0x50
+        } else if !inDesert {
             world.adjustOrnithopters(world.currentLocation, -1)
             world.setRoom(1)
         }
@@ -401,9 +429,13 @@ final class Game: DuneNode {
         }
         world.discover(trip.destination)
         world.setPosition(location: trip.destination, room: 1)
-        world.adjustOrnithopters(trip.destination, 1)
+        if !riding { world.adjustOrnithopters(trip.destination, 1) }
+        riding = false
         gameState.setLocation(trip.destination)
         engine.logger.log(.info, "Flight: landed at \(trip.destination) (\(world.locationName(trip.destination, GameText.shared.command)))")
+        // location_related_to_dying_if_arriving_at_fortress (seg000:503c):
+        // a place in battle takes Paul into it; a hostile one shoots him.
+        if world.nightAttackCheck(at: trip.destination) == .shot { return }
         showCurrentPlace()
         roomEntryScan()
     }
@@ -434,7 +466,7 @@ final class Game: DuneNode {
             if let id = text.findCommand(caption) { rows.append((row, UInt16(id), greyed)) }
         }
         add(.map, "SEE DUNE MAP")
-        add(.worm, "CALL A WORM", true)
+        add(.worm, "CALL A WORM", !world.canCallWorm)
         add(.wait, world.hour < 11 ? "WAIT FOR EVENING" : "WAIT FOR MORNING")
         add(.ornithopter, "TAKE AN ORNITHOPTER")
         return rows
@@ -469,7 +501,8 @@ final class Game: DuneNode {
             idleTime += 5
             showDesert()
         case .worm:
-            break
+            setNodeActive("OpenDesert", false)
+            openMap(select: true, caption: false, riding: true)
         }
     }
 
@@ -824,6 +857,10 @@ final class Game: DuneNode {
         // character number (109 Leto ... 117 Harah); in the COMM room
         // (palace room 8) VIEW NEW MESSAGES (202) and MESSAGES ALREADY SEEN
         // (203) once there is a message.
+        if world.paulInBattle && world.room == 1 {
+            // build_room_command_records in a battle (seg000:2efb).
+            return battleRows().map { $0.id }
+        }
         var items: [UInt16] = [141]
         for person in world.peopleInRoom() where person <= World.harah {
             items.append(UInt16(109 + person))
@@ -839,9 +876,51 @@ final class Game: DuneNode {
     /// VIEW NEW MESSAGES greyed with nothing unread; MESSAGES ALREADY SEEN
     /// greyed when everything is unread.
     private func roomRowsGreyed(_ items: [UInt16]) -> [Bool] {
+        if world.paulInBattle && world.room == 1 {
+            return battleRows().map { $0.greyed }
+        }
         let unread = Int(world.b(World.unread)), count = world.sightingCount
         return items.map { $0 == 202 ? unread == 0 : $0 == 203 ? unread >= count : false }
     }
+
+    // MARK: - Battles
+
+    private enum BattleRow { case map, massive, wholeDay, worm }
+
+    /// SEE DUNE MAP, MASSIVE ATTACK, FIGHT FOR A WHOLE DAY, CALL A WORM
+    /// (greyed before phase 0x4F).
+    private func battleRows() -> [(row: BattleRow, id: UInt16, greyed: Bool)] {
+        var rows: [(row: BattleRow, id: UInt16, greyed: Bool)] = []
+        let text = GameText.shared
+        func add(_ row: BattleRow, _ caption: String, _ greyed: Bool = false) {
+            if let id = text.findCommand(caption) { rows.append((row, UInt16(id), greyed)) }
+        }
+        add(.map, "SEE DUNE MAP")
+        add(.massive, "MASSIVE ATTACK")
+        add(.wholeDay, "FIGHT FOR A WHOLE DAY")
+        add(.worm, "CALL A WORM", !world.canCallWorm)
+        return rows
+    }
+
+    private func handleBattleRow(_ index: Int) {
+        let rows = battleRows()
+        guard index < rows.count, !rows[index].greyed else { return }
+        switch rows[index].row {
+        case .map:
+            openMap(select: false, caption: true)
+        case .massive:
+            let won = world.massiveAttack(at: world.currentLocation)
+            engine.logger.log(.info, "Battle: massive attack \(won ? "won" : "goes on")")
+            showCurrentPlace()
+        case .wholeDay:
+            let periods = world.fightWholeDay()
+            engine.logger.log(.info, "Battle: fought \(periods) periods")
+            showCurrentPlace()
+        case .worm:
+            openMap(select: true, caption: false, riding: true)
+        }
+    }
+
 
     // MARK: - COMM room
 
@@ -1061,6 +1140,7 @@ final class Game: DuneNode {
             ?? text.findCommand("CHANGE TROOP OCCUPATION") {
             troopRows.append((nil, UInt16(row)))
         }
+        if let row = text.findCommand("MOVE TROOP") { troopRows.append((0xFD, UInt16(row))) }
         if let row = text.findCommand("NO MORE ORDERS") { troopRows.append((0xFF, UInt16(row))) }
         dialogueMenuItems = troopRows.map { $0.id }
         publishDialogueUI()
@@ -1081,8 +1161,12 @@ final class Game: DuneNode {
                     (ecology, "SPECIALIZE IN ECOLOGY")]
         } else if job & 0x0C == 0 {
             rows = [(TroopJob.spiceMining, "Spice Mining"), (TroopJob.prospecting, "Spice Prospection")]
+        } else if job == TroopJob.espionage {
+            rows = [(0xFC, "ATTACK")]
         } else if job & 0x0C == 4 {
-            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (ecology, "SPECIALIZE IN ECOLOGY")]
+            // ESPIONAGE greyed without a hidden fort in reach (seg000:69b3).
+            rows = [(world.canStartEspionage(troop: troop) ? 0xFB : 0xFE, "ESPIONAGE"),
+                    (TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (ecology, "SPECIALIZE IN ECOLOGY")]
         } else {
             rows = [((job & 0x0C) | 1, "ASSEMBLY WIND-TRAP"), (TroopJob.spiceMining, "SPECIALIZE IN SPICE"),
                     (TroopJob.militaryTraining, "SPECIALIZE IN ARMY")]
@@ -1100,6 +1184,17 @@ final class Game: DuneNode {
         switch (troopMenu, row.job) {
         case (.orders, nil):
             openOccupationMenu(troop)
+        case (.orders, 0xFD):
+            // MOVE TROOP: choose the place on the map, then "Done".
+            movingTroop = troop
+            dialogueCharacter = nil
+            openMap(select: true, caption: false)
+        case (.occupation, 0xFB):
+            world.startEspionage(troop: troop)
+            openTroopOrders()
+        case (.occupation, 0xFC):
+            if let place = world.troopPlace(troop) { world.startAttack(at: place) }
+            openTroopOrders()
         case (_, 0xFF):
             dialogueContext = .sietch
             dialogueMenuItems = talkRows(dialogueCharacter ?? .fremen2)
@@ -1789,6 +1884,10 @@ final class Game: DuneNode {
         }
 
         if roomRowsGreyed(mainMenuItems)[index] { return }
+        if world.paulInBattle && world.room == 1 {
+            handleBattleRow(index)
+            return
+        }
         switch mainMenuItems[index] {
         case 202:
             openCommList(seen: false)
