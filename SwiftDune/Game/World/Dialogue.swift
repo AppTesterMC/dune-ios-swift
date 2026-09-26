@@ -180,6 +180,8 @@ final class Conversation {
     private var pages: [String] = []
     private var pageIndex = 0
     private(set) var active = true
+    /// Action 4/5 stopped the talk for ACCEPT / REFUSE / ARGUE (ds:9F).
+    private(set) var awaitingChoice = false
 
     /// Actions 1/2/7 set it: 0xFF the verb succeeds, 0 a refusal, 0x80
     /// show equipment.
@@ -201,6 +203,7 @@ final class Conversation {
 
     /// The next page to show, or nil when the conversation is over.
     func next() -> String? {
+        if awaitingChoice { return nil }
         while active {
             if pageIndex < pages.count {
                 defer { pageIndex += 1 }
@@ -208,6 +211,7 @@ final class Conversation {
             }
             if pendingFinish {
                 finishEntry()
+                if awaitingChoice { return nil } // the host shows the bargaining rows
                 if endAfter || single { break }
             }
             if answered || !findEntry() { break }
@@ -218,6 +222,9 @@ final class Conversation {
     }
 
     func endAfterLine() { endAfter = true }
+
+    /// After ACCEPT / REFUSE / ARGUE: the talk goes on (loc_19472).
+    func resume() { awaitingChoice = false }
 
     /// Runs the shown line's action now (a verb reads the gate right after
     /// the answer appears, seg000:95f7).
@@ -272,6 +279,10 @@ final class Conversation {
         case 2: gate = 0
         case 6: endAfter = true
         case 7: gate = 0x80
+        case 4, 5:
+            // 0xA244 / 0xA248: the bargaining question (Duncan or a smuggler).
+            story.world.setB(World.choice, 0)
+            awaitingChoice = true
         case 14:
             if !wasSaid { story.world.setB(0xC2, story.world.b(0xC2) &+ 1) }
         default:
@@ -382,6 +393,20 @@ final class Story {
             world.raiseContactRange()
         case 15 where speaker == World.jessica:
             world.setB(0xF5, world.b(0xF5) &+ 1)
+        case 8 where speaker == World.duncan:
+            world.duncanOffers()
+        case 9 where speaker == World.duncan:
+            world.duncanAccept()
+        case 15 where speaker == World.duncan:
+            let closing = world.duncanClosing()
+            world.addSighting(closing.sighting)
+            if closing.endTalk { conversation.endAfterLine() }
+        case 8 where speaker == World.captain:
+            // Character 12 shows the hidden place whose pointer is at ds:11CE.
+            let pointer = Int(world.w(0x11CE))
+            if pointer >= Location.tableOffset && (pointer - Location.tableOffset) % Location.recordSize == 0 {
+                world.reveal([(pointer - Location.tableOffset) / Location.recordSize])
+            }
         default:
             DuneEngine.shared.logger.log(.warn, "Story: event \(action) of speaker \(speaker) not ported yet")
         }

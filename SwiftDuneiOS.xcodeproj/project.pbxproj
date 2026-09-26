@@ -46,6 +46,7 @@
 		92C291A159F21760AA2040FB /* Prologue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B0C71306981EBCB8273987E /* Prologue.swift */; };
 		97B9C2334C3C29253EA7EF20 /* Effects.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A65C67DD10F826B528CE84 /* Effects.swift */; };
 		9A68E05B56A4A12A8832A35A /* FlatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = A424E2236B26FE1AA258106C /* FlatMap.swift */; };
+		A0727A4A9287CA6BDBEB9D74 /* Shipments.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86E21DFF133C0BBA0418642 /* Shipments.swift */; };
 		A0FF69C5D503BCDD5459A4F6 /* Sietch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F9C69085AF261F5322A2B35 /* Sietch.swift */; };
 		A824394E8789098F999E6CCC /* Flight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159E74011B9FCF456A792355 /* Flight.swift */; };
 		A832F3C769ABDE450DC0D194 /* Globe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 877A9ECC2E6BF76E58F7BA61 /* Globe.swift */; };
@@ -153,6 +154,7 @@
 		C33501B88C934EC553E84E3D /* Sentence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sentence.swift; sourceTree = "<group>"; };
 		C40F00E311A9C9C2AF57DBEE /* Math.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Math.swift; sourceTree = "<group>"; };
 		C6007AD05E00516F3582EFF3 /* OpenDesert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenDesert.swift; sourceTree = "<group>"; };
+		C86E21DFF133C0BBA0418642 /* Shipments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shipments.swift; sourceTree = "<group>"; };
 		C8F3A7F73704B0FFBE303441 /* Credits.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Credits.swift; sourceTree = "<group>"; };
 		D83B000A1E76930997D01267 /* Video.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Video.swift; sourceTree = "<group>"; };
 		DA6E986FCF4CADAC004230F2 /* OPL3Envelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Envelope.swift; sourceTree = "<group>"; };
@@ -251,6 +253,7 @@
 				7DBAADC5F5BE640A1807A779 /* GameText.swift */,
 				44D01507F2978E1BE26413C5 /* MapRenderer.swift */,
 				EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */,
+				C86E21DFF133C0BBA0418642 /* Shipments.swift */,
 				ED848A62BEDC228B03CCABC5 /* Troops.swift */,
 				41386BC22871F9E97BBE2687 /* World.swift */,
 			);
@@ -505,6 +508,7 @@
 				55B568F566762A0293DCC8B3 /* Scenery.swift in Sources */,
 				1E154D72CD8AC522AC7E5547 /* Sentence.swift in Sources */,
 				08F71540CE2D34A159788D85 /* Shaders.metal in Sources */,
+				A0727A4A9287CA6BDBEB9D74 /* Shipments.swift in Sources */,
 				A0FF69C5D503BCDD5459A4F6 /* Sietch.swift in Sources */,
 				108A987052BC437BDE2ACBA6 /* Sky.swift in Sources */,
 				E9B6CA422155E4D8C3D5EF57 /* Sound.swift in Sources */,

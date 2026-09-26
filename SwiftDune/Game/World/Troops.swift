@@ -247,6 +247,15 @@ extension World {
                 }
             }
         }
+        if troopEvents && hour == 3 {
+            // actions_time_in_day_3 (seg000:20a4): the Emperor's shipments.
+            let day = shipmentDay()
+            if day.ending { pendingEnding = 180 } // "As Paul Atreides failed to respond to my spice demands..."
+            addSighting(day.sighting)
+        }
+        if hour == 8 && shipmentReminderDue {
+            queueVision(0x30B) // actions_time_in_day_8 (seg000:1dda)
+        }
         if hour == 15 && (rollRandom(2) & 1) == 1 {
             // Every Harkonnen troop of 1..199 (x 10 men) gains ten men.
             for id in 1...World.troopCount where troopExists(id) && troopByte(id, 16) & 0x80 != 0 {

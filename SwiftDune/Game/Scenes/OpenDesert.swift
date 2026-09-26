@@ -87,3 +87,34 @@ final class VisionDream: DuneNode {
         }
     }
 }
+
+
+/// An ending's text (COMMAND 175-180) on black, as the original's
+/// pending_room_screen_request endings show it.
+final class EndingScreen: DuneNode {
+    private var font: GameFont?
+    private var text = ""
+
+    init() {
+        super.init("Ending")
+    }
+
+    override func onEnable() {
+        font = GameFont()
+    }
+
+    override func onDisable() {
+        font = nil
+    }
+
+    override func onParamsChange() {
+        if let text = params["text"] as? String { self.text = text }
+    }
+
+    override func render(_ buffer: PixelBuffer) {
+        guard let font = font else { return }
+        Primitives.fillRect(DuneRect(0, 0, 320, 152), 0, buffer, isOffset: false)
+        font.paletteIndex = 250
+        font.render(text, rect: DuneRect(24, 20, 272, 112), buffer: buffer, alignment: .center, style: .normal)
+    }
+}

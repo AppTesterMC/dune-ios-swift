@@ -29,6 +29,7 @@ final class Game: DuneNode {
     private let story = Story.shared
 
     private enum DialogueContext: Equatable {
+        case comm
         case palace
         case sietch
         case troop
@@ -458,6 +459,26 @@ final class Game: DuneNode {
     }
 
 
+    // MARK: - Endings
+
+    /// An ending (COMMAND 175-180): its text on black; a tap restarts.
+    private func showEnding(_ command: Int) {
+        engine.logger.log(.info, "Ending: COMMAND \(command)")
+        conversation = nil
+        dialogueCharacter = nil
+        mapActive = false
+        flight = nil
+        if findNode("Ending") == nil { attachNode(EndingScreen()) }
+        findNode("Ending")?.params = ["text": GameText.shared.command(command)]
+        setNodeActive("Ending", true, .foreground)
+        var items: [UInt16] = []
+        if let restart = GameText.shared.findCommand("RESTART GAME") { items.append(UInt16(restart)) }
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed, rightPanel: .rect, items: items, directions: [],
+            day: gameState.day, phase: gameState.phase))
+    }
+
+
     // MARK: - Visions
 
     /// idle_room_message_check (seg000:2b2a): at phase 0x14, alone in the
@@ -638,20 +659,72 @@ final class Game: DuneNode {
 
 
     private func roomCharacterItems() -> [UInt16] {
-        if currentGameRoom == 8 {
-            // COMMAND1.HSQ does not contain the COMM-room rows; the original
-            // executable supplies these labels from its room command table.
-            // Keep the exact captions here and reserve the numeric ids for
-            // the Swift input dispatcher only.
-            return [0, 1, 2]
-        }
         // SEE DUNE MAP, then one row per person in the room: COMMAND 109 +
-        // character number (109 Leto ... 117 Harah).
+        // character number (109 Leto ... 117 Harah); in the COMM room
+        // (palace room 8) VIEW NEW MESSAGES (202) and MESSAGES ALREADY SEEN
+        // (203) once there is a message.
         var items: [UInt16] = [141]
         for person in world.peopleInRoom() where person <= World.harah {
             items.append(UInt16(109 + person))
         }
+        if inCommRoom && world.sightingCount > 0 {
+            items = Array(items.prefix(3)) + [202, 203]
+        }
         return Array(items.prefix(5))
+    }
+
+    private var inCommRoom: Bool { world.placeType == Location.palace && world.room == 8 }
+
+    /// VIEW NEW MESSAGES greyed with nothing unread; MESSAGES ALREADY SEEN
+    /// greyed when everything is unread.
+    private func roomRowsGreyed(_ items: [UInt16]) -> [Bool] {
+        let unread = Int(world.b(World.unread)), count = world.sightingCount
+        return items.map { $0 == 202 ? unread == 0 : $0 == 203 ? unread >= count : false }
+    }
+
+    // MARK: - COMM room
+
+    /// The message list: senders' rows (sighting index) newest first, then Cancel.
+    private var commRows: [(index: Int?, id: UInt16)] = []
+
+    private func openCommList(seen: Bool) {
+        commRows = []
+        var i = world.sightingCount - 1
+        while i >= 0 && commRows.count < 4 {
+            let message = world.sighting(i)
+            if (message & 0x80 != 0) == seen {
+                commRows.append((i, UInt16(109 + Int(message & 0x3F))))
+            }
+            i -= 1
+        }
+        commRows.append((nil, 150)) // "  Cancel"
+        dialogueContext = .comm
+        dialogueMenuItems = commRows.map { $0.id }
+        publishDialogueUI()
+    }
+
+    /// A message: marked seen, ds:24 = its variant, the sender's list-4 line
+    /// with the " Viewed" row (seg000:2864..29d4).
+    private func showMessage(_ row: Int) {
+        guard row >= 0 && row < commRows.count, let index = commRows[row].index else {
+            closeComm()
+            return
+        }
+        let message = world.viewSighting(index)
+        world.setB(0x24, message.variant)
+        let speaker = duneCharacter(number: message.person) ?? .none
+        dialogueCharacter = speaker
+        showRoomOrSietch()
+        dialogueMenuItems = [204] // " Viewed"
+        conversation = Conversation(story: story, character: min(message.person, World.fremenChief), list: 4, mask: 0x80, oneList: true)
+        showNextConversationPage()
+    }
+
+    private func closeComm() {
+        dialogueContext = .palace
+        dialogueCharacter = nil
+        showRoom()
+        publishMainUI()
     }
 
 
@@ -914,6 +987,10 @@ final class Game: DuneNode {
         case World.chani: return .chani
         case World.harah: return .harah
         case World.smuggler: return .smuggler
+        case 9: return .baron
+        case 10: return .feyd
+        case 11: return .emperor
+        case World.captain: return .captain
         case World.fremen...: return .fremen1
         default: return nil
         }
@@ -931,7 +1008,19 @@ final class Game: DuneNode {
     /// Shows the next page; false when the conversation has ended.
     @discardableResult
     private func showNextConversationPage() -> Bool {
-        guard let conversation = conversation, let page = conversation.next() else {
+        if let conversation = conversation, conversation.awaitingChoice {
+            return true
+        }
+        let page = conversation?.next()
+        if page == nil, let conversation = conversation, conversation.awaitingChoice {
+            // The bargaining question: ACCEPT / REFUSE / ARGUE (action 4).
+            setNodeActive("Dialogue", false)
+            dialogueContext = .shipment
+            dialogueMenuItems = [226, 227, 228]
+            publishDialogueUI()
+            return true
+        }
+        guard let conversation = conversation, let page = page else {
             self.conversation = nil
             setNodeActive("Dialogue", false)
             if dreaming {
@@ -1005,42 +1094,32 @@ final class Game: DuneNode {
             return
         }
 
-        if dialogueContext == .shipment {
-            switch item {
-            case 226: // ACCEPT
-                gameState.acceptSpiceShipment()
-                dialoguePhraseOverride = 259 // The spice has been shipped...
-                dialogueContext = sietchActive ? .sietch : .palace
-                dialogueMenuItems = talkRows(dialogueCharacter ?? .none)
-                showDialogueLine()
-            case 227: // REFUSE
-                gameState.refuseSpiceShipment()
-                dialoguePhraseOverride = 268 // Don't tell me that you don't want to send...
-                dialogueContext = sietchActive ? .sietch : .palace
-                dialogueMenuItems = talkRows(dialogueCharacter ?? .none)
-                showDialogueLine()
-            case 228: // ARGUE
-                gameState.argueSpiceShipment()
-                gameState.setMilestone(.shipmentRequested, action: "ARGUE SHIPMENT")
-                dialoguePhraseOverride = 229 // staged stock/demand alternative
-                showDialogueLine()
-            default:
-                break
+        if dialogueContext == .comm {
+            if item == 204 { // " Viewed"
+                closeComm()
+            } else {
+                showMessage(index)
             }
+            return
+        }
+
+        if dialogueContext == .shipment {
+            // ACCEPT (226) = 1, REFUSE (227) = 2, ARGUE (228) = 3; the
+            // talk then goes on from the dialogue data.
+            let choice: UInt8 = item == 226 ? 1 : item == 227 ? 2 : 3
+            world.bargainChoice(choice)
+            dialogueContext = sietchActive ? .sietch : .palace
+            dialogueMenuItems = talkRows(dialogueCharacter ?? .none)
+            conversation?.resume()
+            publishDialogueUI()
+            showNextConversationPage()
             return
         }
 
         switch item {
         case 133:
             if let character = dialogueCharacter {
-                if character == .duncan && gameState.shipmentPending && gameState.storyPhase >= 0x15 {
-                    // Duncan's shipment bargaining is not driven by the
-                    // dialogue data yet (actions 4/8/9/15 for Duncan).
-                    gameState.beginDuncanShipmentConversation()
-                    dialogueContext = .shipment
-                    dialogueMenuItems = [226, 227, 228]
-                    showDialogueLine()
-                } else if !startConversation(with: character) {
+                if !startConversation(with: character) {
                     showDialogueLine()
                 }
             }
@@ -1155,6 +1234,9 @@ final class Game: DuneNode {
             arrive()
         }
         checkIdle(elapsedTime)
+        if let ending = world.pendingEnding, !isOverlayActive("Ending") {
+            showEnding(ending)
+        }
         super.update(elapsedTime)
     }
 
@@ -1185,25 +1267,6 @@ final class Game: DuneNode {
         (findNode("Fresk") as? Fresk)?.showResults()
     }
 
-    private func showCommunication(mode: Int) {
-        if findNode("Communication") == nil {
-            attachNode(CommunicationOverlay())
-        }
-        if let communication = findNode("Communication") {
-            communication.params = [
-                "mode": mode,
-                // The first Emperor sighting is the exact PHRASE11 branch
-                // used by the original COMM-room message handler.
-                "phraseIndex": 225
-            ]
-        }
-        setNodeActive("Communication", true, .foreground)
-        if mode == 1 && gameState.shipmentArmed {
-            gameState.shipSpiceInCommunicationRoom()
-        }
-    }
-    
-    
     func showBook() {
         if findNode("Book") == nil {
           attachNode(Book())
@@ -1220,14 +1283,6 @@ final class Game: DuneNode {
 
     override func onKey(_ key: DuneKeyEvent) {
         idleTime = 0
-        if isOverlayActive("Communication") {
-            if key.specialKey == .keyEscape || key.char == " " || key.specialKey == .keyReturn {
-                setNodeActive("Communication", false)
-                publishMainUI()
-            }
-            return
-        }
-
         if isOverlayActive("Dialogue") {
             if conversation != nil {
                 showNextConversationPage()
@@ -1381,32 +1436,17 @@ final class Game: DuneNode {
 
     override func onClick(_ event: DuneMouseClickEvent) {
         idleTime = 0
+        if isOverlayActive("Ending") {
+            setNodeActive("Ending", false)
+            world.pendingEnding = nil
+            onEnable() // RESTART GAME
+            return
+        }
         if inDesert && !mapActive && flight == nil && !isOverlayActive("Dialogue") && !isOverlayActive("Fresk")
             && !isOverlayActive("Book") && menuRect.contains(event.point) {
             handleDesertRow(Int((event.point.y - menuRect.y) / 8))
             return
         }
-        if isOverlayActive("Communication") {
-            let point = event.point
-            if point.y < 152 {
-                if let communication = findNode("Communication") as? CommunicationOverlay {
-                    if point.y >= 30 && point.y < 68 {
-                        communication.params = ["mode": 1, "phraseIndex": 225]
-                        if gameState.shipmentArmed {
-                            gameState.shipSpiceInCommunicationRoom()
-                        }
-                    } else if point.y >= 68 || point.y < 34 {
-                        setNodeActive("Communication", false)
-                        publishMainUI()
-                    }
-                }
-            } else {
-                setNodeActive("Communication", false)
-                publishMainUI()
-            }
-            return
-        }
-
         if isOverlayActive("Dialogue") {
             if conversation != nil {
                 showNextConversationPage()
@@ -1572,13 +1612,12 @@ final class Game: DuneNode {
             return
         }
 
+        if roomRowsGreyed(mainMenuItems)[index] { return }
         switch mainMenuItems[index] {
-        case 0 where currentGameRoom == 8:
-            showCommunication(mode: 0)
-        case 1 where currentGameRoom == 8:
-            showCommunication(mode: 1)
-        case 2 where currentGameRoom == 8:
-            publishMainUI()
+        case 202:
+            openCommList(seen: false)
+        case 203:
+            openCommList(seen: true)
         case 141:
             openMap(select: false, caption: true)
         case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132:
@@ -1723,9 +1762,7 @@ final class Game: DuneNode {
 
     private func publishMainUI() {
         mainMenuItems = roomCharacterItems()
-        mainMenuCaptions = currentGameRoom == 8
-            ? ["VIEW NEW MESSAGES", "MESSAGES ALREADY SEEN", "CANCEL"]
-            : nil
+        mainMenuCaptions = nil
         let directions = roomDirections()
 
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
@@ -1735,7 +1772,8 @@ final class Game: DuneNode {
             directions: directions,
             day: gameState.day,
             phase: gameState.phase,
-            captions: mainMenuCaptions
+            captions: mainMenuCaptions,
+            greyed: roomRowsGreyed(mainMenuItems)
         ))
     }
 
@@ -1767,6 +1805,11 @@ final class Game: DuneNode {
             currentGameRoom = room
             showRoom()
             publishMainUI()
+            if world.shipmentReady {
+                // The agreed spice leaves from the COMM room (sub_12566;
+                // its star-field animation is not shown).
+                world.shipSpice()
+            }
             roomEntryScan()
         case .leave:
             // 252-254 leave the place: the flat map to choose a destination.

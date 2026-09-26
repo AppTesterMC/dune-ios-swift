@@ -235,6 +235,8 @@ final class World {
     private(set) var isFloppy = true
     private(set) var loaded = false
     private(set) var palaceTable = 0
+    /// An ending the rules reached (COMMAND id of its text), for the game to show.
+    var pendingEnding: Int?
     /// Mining's carried remainder under 10 kg (ds:46e1, outside the save).
     var harvestRemainder = 0
     private(set) var pointerTable = 0
@@ -851,6 +853,7 @@ final class World {
         vars[0xFE8] = 0x0A
         setB(0xD5, 0xFF)
         setB(World.paulEvents, b(World.paulEvents) | 1)
+        addSighting(armShipments())
         queueVision(1)
         DuneEngine.shared.logger.log(.info, "Story: Paul's first vision (phase 0x15)")
     }

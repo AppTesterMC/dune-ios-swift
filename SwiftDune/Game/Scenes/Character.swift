@@ -26,6 +26,10 @@ enum DuneCharacter: Equatable {
   case fremen2
   case fremen3
   case smuggler
+  /// The Emperor (EMPR.HSQ) speaks through the COMM room.
+  case emperor
+  /// The Harkonnen captain (HARK.HSQ).
+  case captain
   
   var resourceName: String {
     switch self {
@@ -61,6 +65,10 @@ enum DuneCharacter: Equatable {
       "FRM3.HSQ"
     case .smuggler:
       "SMUG.HSQ"
+    case .emperor:
+      "EMPR.HSQ"
+    case .captain:
+      "HARK.HSQ"
     case .none:
       ""
     }

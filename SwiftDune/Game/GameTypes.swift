@@ -388,11 +388,8 @@ final class GameState {
             if shipmentPending && shipmentDaysRemaining > 0 {
                 shipmentDaysRemaining -= 1
             }
-            // In the original, the first Emperor demand is armed by the
-            // first-vision callback (phase 0x15), not by entering a room.
-            if storyPhase >= 0x15 && !shipmentPending && shipmentDemand == 0 {
-                rollSpiceShipment()
-            }
+            // The Emperor's demands are the data segment's now
+            // (World.armShipments / shipmentDay, Shipments.swift).
         }
     }
 
