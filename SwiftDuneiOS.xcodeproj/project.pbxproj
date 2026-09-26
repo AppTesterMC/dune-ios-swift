@@ -29,6 +29,7 @@
 		35F233AD214026EAFA58C4AA /* CopyProtection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8DC04CF4A3FA4E803BA0D2F /* CopyProtection.swift */; };
 		393C94E7462BE6CD5409ABA5 /* OPL3Envelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6E986FCF4CADAC004230F2 /* OPL3Envelope.swift */; };
 		49DF4C3A6ABED5AB8B74DB25 /* UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 677040991DC38FD2DF88EF50 /* UI.swift */; };
+		4C486881265E30C259750CE0 /* DuneFiles in Resources */ = {isa = PBXBuildFile; fileRef = 95925049A8B64C75E04B148D /* DuneFiles */; };
 		4D52F2F5F7D6D605535451EB /* OPL3Lfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C5ABAC6AC7FEDC46E296543 /* OPL3Lfo.swift */; };
 		53E840D58AE19F5C216845A5 /* OPL3SignalSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA981EC2C4EEACB141DAC5B4 /* OPL3SignalSource.swift */; };
 		55B568F566762A0293DCC8B3 /* Scenery.swift in Sources */ = {isa = PBXBuildFile; fileRef = E417D53CB37BF4C071341E5B /* Scenery.swift */; };
@@ -71,7 +72,6 @@
 		C83CBFB37121CE1BF28D70B2 /* Logo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3ADA3F49410B233337EF0C7 /* Logo.swift */; };
 		CDF84A6312175FBDFCB23EC1 /* Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07008EFEDB1BCE59323A7BB1 /* Background.swift */; };
 		CE597F6D582912E8087FBB67 /* GameTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C29FD2E9E41E5486D49300E /* GameTypes.swift */; };
-		CF4AD45B223FE3BAD5CDC0B4 /* DuneFilesCD in Resources */ = {isa = PBXBuildFile; fileRef = EB66F7ABF4A634F9E091F06C /* DuneFilesCD */; };
 		D074D0F21E47AA555F386A46 /* Battles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC49C537309D9F780BF77CB /* Battles.swift */; };
 		D51758ECDCC4E603F5F5AC28 /* Character.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85DE6529940F5D8FA35FE98 /* Character.swift */; };
 		D601D790748A1DFFFD88A57E /* WormCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24791A4FCCB8FADF4A51268 /* WormCall.swift */; };
@@ -148,6 +148,7 @@
 		88147B6DDD57BAA6F60A6727 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		91936B84BCC6E58226B1D3BF /* PrologueSubtitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrologueSubtitle.swift; sourceTree = "<group>"; };
 		92127383EBC7C63BA54D0481 /* FlightLandscape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightLandscape.swift; sourceTree = "<group>"; };
+		95925049A8B64C75E04B148D /* DuneFiles */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DuneFiles; sourceTree = SOURCE_ROOT; };
 		95B81D2038E35642788D4E84 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
 		966DD802EC142B64CE737FE9 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		980A9AB7AA7002DEECA39C33 /* AppIcon60x60@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIcon60x60@3x.png"; sourceTree = "<group>"; };
@@ -186,7 +187,6 @@
 		EA981EC2C4EEACB141DAC5B4 /* OPL3SignalSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3SignalSource.swift; sourceTree = "<group>"; };
 		EAFE284DE31237B53D5FC73A /* Presents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presents.swift; sourceTree = "<group>"; };
 		EB12408828DD78414D418946 /* LogoSwap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoSwap.swift; sourceTree = "<group>"; };
-		EB66F7ABF4A634F9E091F06C /* DuneFilesCD */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DuneFilesCD; sourceTree = SOURCE_ROOT; };
 		ED17296284B474C821364179 /* OPL3Chip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Chip.swift; sourceTree = "<group>"; };
 		ED848A62BEDC228B03CCABC5 /* Troops.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Troops.swift; sourceTree = "<group>"; };
 		EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveGame.swift; sourceTree = "<group>"; };
@@ -237,7 +237,7 @@
 		13945852169FBC5423D55465 = {
 			isa = PBXGroup;
 			children = (
-				EB66F7ABF4A634F9E091F06C /* DuneFilesCD */,
+				95925049A8B64C75E04B148D /* DuneFiles */,
 				6F14140BAA778E67648058A7 /* Engine */,
 				1D63A7943551802A1406E7E1 /* Game */,
 				67CB7C9C2E9C5AF40A39088D /* iOS */,
@@ -475,7 +475,7 @@
 				E29DD2E74F9B4021B61C0163 /* AppIcon60x60@3x.png in Resources */,
 				8AE64D551BAB8E353F9B3365 /* AppIcon76x76@2x~ipad.png in Resources */,
 				55E203178C00FE0717D5A376 /* AppIcon83.5x83.5@2x~ipad.png in Resources */,
-				CF4AD45B223FE3BAD5CDC0B4 /* DuneFilesCD in Resources */,
+				4C486881265E30C259750CE0 /* DuneFiles in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -588,7 +588,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.apptestermc.swiftdune.cd;
+				PRODUCT_BUNDLE_IDENTIFIER = com.apptestermc.swiftdune;
 				PRODUCT_NAME = Dune;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -664,7 +664,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.apptestermc.swiftdune.cd;
+				PRODUCT_BUNDLE_IDENTIFIER = com.apptestermc.swiftdune;
 				PRODUCT_NAME = Dune;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
