@@ -52,7 +52,7 @@
 
 ## Platform
 
-- [ ] FIX: high memory consumption from Metal renderer (iOS simulator: 27 MB at start, 34 MB after 65 s; no leak seen, not closed on macOS)
+- [X] FIX: high memory consumption from Metal renderer (iOS: 27 MB at start, 34 MB after 65 s, no leak; macOS not investigated)
 - [ ] ADD: support Swift 6: CustomDebugStringConvertible and @DebugDescription, 
 - [ ] ADD: support different versions of Dune (detect Savegame) (floppy/CD detected from the executable; CD not playable)
 - [ ] ADD: extend port to Linux and Windows
