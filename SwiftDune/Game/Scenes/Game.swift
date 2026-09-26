@@ -104,7 +104,17 @@ final class Game: DuneNode {
       showUI()
       showCurrentPlace()
       if let phase = DevHarness.shared.startPhase {
-          world.setB(World.phase, phase)
+          // Through each chapter's callback (doors, people, visions), then
+          // the phase itself; the scenes they ask for are skipped.
+          var p: UInt8 = 4
+          while p <= phase { story.setGamePhase(p); p += 4 }
+          story.setGamePhase(phase)
+          _ = story.takePendingScene()
+          showCurrentPlace()
+      }
+      DevHarness.shared.handlers["scene"] = { [weak self] argument in
+          guard let self = self, let script = UInt16(argument, radix: 16) else { return }
+          self.startScene(script)
       }
       DevHarness.shared.handlers["point"] = { [weak self] argument in
           let parts = argument.split(separator: ",").compactMap { Int($0) }

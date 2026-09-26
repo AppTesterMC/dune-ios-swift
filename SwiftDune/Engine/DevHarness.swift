@@ -12,7 +12,8 @@
 //    DUNE_LOAD=<slot>         start from DUNE21S<slot>.SAV (0-4 ship with the game)
 //    DUNE_LOG_MEMORY=1        log the memory footprint every 5 s
 //    DUNE_PHASE=<hex>         start a new game at this story phase (ds:2A)
-//  Script actions handled by the game: place:<index>, point:<lat>,<lng>
+//  Script actions handled by the game: place:<index>, point:<lat>,<lng>,
+//  scene:<hex CD offset>
 //    DUNE_SCRIPT=<steps>      ';'-separated "<seconds>:<action>[:<arg>]"
 //        key:<esc|ret|del|left|right|up|down|c>   press a key (c = one char)
 //        click:<x>,<y>                           click at a game pixel
