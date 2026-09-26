@@ -74,6 +74,9 @@ final class VisionDream: DuneNode {
         picture.clearBuffer()
         vision.setPalette()
         vision.drawFrame(0, x: 0, y: 0, buffer: picture)
+        // VIS.HSQ's colours (128-207) must survive the balloon's and the
+        // panel's ICONES palette, set after this node draws.
+        engine.finalPalettes.append { vision.setPalette() }
         for y in 0..<min(152, buffer.height) {
             let shift = Int((6.0 * sin(2.0 * Double.pi * (Double(y) / 48.0 + currentTime))).rounded())
             for x in 0..<320 {

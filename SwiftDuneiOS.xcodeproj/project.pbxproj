@@ -13,6 +13,7 @@
 		0AF3262F128BADDF4F5BF6ED /* Sunrise.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C9D1665A50F9BA406C96796 /* Sunrise.swift */; };
 		0C01AC13E0C90AE29E1D0053 /* DialogueOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7E1DCC17CB01DA10832866 /* DialogueOverlay.swift */; };
 		108A987052BC437BDE2ACBA6 /* Sky.swift in Sources */ = {isa = PBXBuildFile; fileRef = B76C036D96F58DE99D06F9B1 /* Sky.swift */; };
+		10D08474C46158342F0F86DB /* Ecology.swift in Sources */ = {isa = PBXBuildFile; fileRef = 593F332A71677782493E5D64 /* Ecology.swift */; };
 		182F7C59108908CCD4B28BC2 /* DuneTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4353B53E70AE12D216242FE5 /* DuneTitle.swift */; };
 		1CE2EE70011A60D31412048D /* PrologueSubtitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91936B84BCC6E58226B1D3BF /* PrologueSubtitle.swift */; };
 		1E154D72CD8AC522AC7E5547 /* Sentence.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33501B88C934EC553E84E3D /* Sentence.swift */; };
@@ -67,6 +68,7 @@
 		C83CBFB37121CE1BF28D70B2 /* Logo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3ADA3F49410B233337EF0C7 /* Logo.swift */; };
 		CDF84A6312175FBDFCB23EC1 /* Background.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07008EFEDB1BCE59323A7BB1 /* Background.swift */; };
 		CE597F6D582912E8087FBB67 /* GameTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C29FD2E9E41E5486D49300E /* GameTypes.swift */; };
+		D074D0F21E47AA555F386A46 /* Battles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC49C537309D9F780BF77CB /* Battles.swift */; };
 		D51758ECDCC4E603F5F5AC28 /* Character.swift in Sources */ = {isa = PBXBuildFile; fileRef = A85DE6529940F5D8FA35FE98 /* Character.swift */; };
 		D601D790748A1DFFFD88A57E /* WormCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = E24791A4FCCB8FADF4A51268 /* WormCall.swift */; };
 		D9A79D17D6859E08AE065BD2 /* Sprite.swift in Sources */ = {isa = PBXBuildFile; fileRef = 850C3BC698B9935363B2F854 /* Sprite.swift */; };
@@ -115,7 +117,9 @@
 		495E8D1A298936E97E9357AA /* OPL3Operator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Operator.swift; sourceTree = "<group>"; };
 		49785BB76D2B4F6FD6D92487 /* Intro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intro.swift; sourceTree = "<group>"; };
 		4B862400455C08F042DF5FB6 /* Animation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Animation.swift; sourceTree = "<group>"; };
+		4BC49C537309D9F780BF77CB /* Battles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Battles.swift; sourceTree = "<group>"; };
 		54D7F2800E07FF9121E0AAE3 /* Palace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Palace.swift; sourceTree = "<group>"; };
+		593F332A71677782493E5D64 /* Ecology.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ecology.swift; sourceTree = "<group>"; };
 		5C5ABAC6AC7FEDC46E296543 /* OPL3Lfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPL3Lfo.swift; sourceTree = "<group>"; };
 		5E5EBA5600EB2DFFC21C59DD /* DuneiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DuneiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		614A6BFE79A0D88DF3EC7C6A /* PixelBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelBuffer.swift; sourceTree = "<group>"; };
@@ -251,7 +255,9 @@
 		61A6779596F83CC88DC80D0B /* World */ = {
 			isa = PBXGroup;
 			children = (
+				4BC49C537309D9F780BF77CB /* Battles.swift */,
 				DB3B70E87F231AB33831B982 /* Dialogue.swift */,
+				593F332A71677782493E5D64 /* Ecology.swift */,
 				7DBAADC5F5BE640A1807A779 /* GameText.swift */,
 				44D01507F2978E1BE26413C5 /* MapRenderer.swift */,
 				79B17CEA2728E8C68CC7FBD6 /* MusicSituation.swift */,
@@ -451,6 +457,7 @@
 				2C75046CD92A7682D1D1F8DA /* Attack.swift in Sources */,
 				FEFA52DAF68263A524CA88D2 /* AudioPlayer.swift in Sources */,
 				CDF84A6312175FBDFCB23EC1 /* Background.swift in Sources */,
+				D074D0F21E47AA555F386A46 /* Battles.swift in Sources */,
 				EDB0E21F10731B3DCCD3BAB6 /* Book.swift in Sources */,
 				D51758ECDCC4E603F5F5AC28 /* Character.swift in Sources */,
 				35F233AD214026EAFA58C4AA /* CopyProtection.swift in Sources */,
@@ -464,6 +471,7 @@
 				2657FAEE4A9F7C3BC25E5DF3 /* DuneEngine.swift in Sources */,
 				E8488A747E7832B0A818EBA3 /* DuneIOSApp.swift in Sources */,
 				182F7C59108908CCD4B28BC2 /* DuneTitle.swift in Sources */,
+				10D08474C46158342F0F86DB /* Ecology.swift in Sources */,
 				97B9C2334C3C29253EA7EF20 /* Effects.swift in Sources */,
 				8BF55510EC2D3A6ECCB014BD /* Event.swift in Sources */,
 				9A68E05B56A4A12A8832A35A /* FlatMap.swift in Sources */,

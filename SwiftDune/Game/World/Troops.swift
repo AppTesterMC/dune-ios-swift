@@ -8,8 +8,10 @@
 //
 //  Port of the ScummVM Dune engine's world.cpp / troops.cpp / battle.cpp
 //  (runPeriod, rallyTroop, setTroopOccupation, mineSpice, prospect,
-//  changeCharisma). Not ported yet: military training, espionage, attacks,
-//  ecology jobs, marches (their periods are skipped).
+//  changeCharisma). Marches, military training, espionage and attacks are
+//  in Battles.swift, the ecology jobs in Ecology.swift. Not ported: the
+//  harvester breakdowns, saboteurs, the small-troop merge (seg000:6d19),
+//  the skill decay every 4 days (6d7b) and the Harkonnen raids (1f64).
 //
 
 import Foundation
@@ -37,16 +39,23 @@ extension World {
     private func troopOffset(_ id: Int) -> Int { World.troopTable + World.troopSize * (id - 1) }
     func troopByte(_ id: Int, _ byte: Int) -> UInt8 { vars[troopOffset(id) + byte] }
     func setTroopByte(_ id: Int, _ byte: Int, _ value: UInt8) { setRawB(troopOffset(id) + byte, value) }
-    private func troopWord(_ id: Int, _ byte: Int) -> UInt16 { rawW(troopOffset(id) + byte) }
-    private func setTroopWord(_ id: Int, _ byte: Int, _ value: UInt16) {
+    func troopWord(_ id: Int, _ byte: Int) -> UInt16 { rawW(troopOffset(id) + byte) }
+    func setTroopWord(_ id: Int, _ byte: Int, _ value: UInt16) {
         setRawB(troopOffset(id) + byte, UInt8(value & 0xFF))
         setRawB(troopOffset(id) + byte + 1, UInt8(value >> 8))
     }
-    private func locationByte(_ index: Int, _ byte: Int) -> UInt8 {
+    func locationByte(_ index: Int, _ byte: Int) -> UInt8 {
         vars[Location.tableOffset + index * Location.recordSize + byte]
     }
-    private func setLocationByte(_ index: Int, _ byte: Int, _ value: UInt8) {
+    func setLocationByte(_ index: Int, _ byte: Int, _ value: UInt8) {
         setRawB(Location.tableOffset + index * Location.recordSize + byte, value)
+    }
+    func locationWord(_ index: Int, _ byte: Int) -> UInt16 {
+        rawW(Location.tableOffset + index * Location.recordSize + byte)
+    }
+    func setLocationWord(_ index: Int, _ byte: Int, _ value: UInt16) {
+        setLocationByte(index, byte, UInt8(value & 0xFF))
+        setLocationByte(index, byte + 1, UInt8(value >> 8))
     }
 
     func troopExists(_ id: Int) -> Bool { id >= 1 && id <= World.troopCount && troopByte(id, 0) != 0 }
@@ -121,9 +130,9 @@ extension World {
         setTroopWord(id, 0x0E, 0)
         setTroopByte(id, 0x14, UInt8(truncatingIfNeeded: w(World.gameTime) >> 4))
         if let place = troopPlace(id), locationByte(place, 11) == 0 {
-            // The first troop rallied at a place: its Atreides disc (the map
-            // painting waits for the ecology port).
+            // seg000:6704: the first troop rallied at a place paints its Atreides disc.
             setLocationByte(place, 11, 2)
+            paintArea(place, stage: 0x20, radius: 2)
         }
         DuneEngine.shared.logger.log(.info, "Troops: troop \(id) rallied, \(b(World.fremenTroops)) Fremen troops, charisma \(b(World.charisma))")
         return requested
@@ -225,14 +234,21 @@ extension World {
         setTroopByte(id, 3, troopByte(id, 3) | TroopJob.stopped)
     }
 
-    /// run_events_for_current_time_period (seg000:1b23): troop jobs, then
-    /// the new day's Harkonnen production and today's spice.
+    /// run_events_for_current_time_period (seg000:1b23): troop jobs, the
+    /// time of day's action, the new day's ecology walk, Harkonnen
+    /// production and today's spice, then Paul's battle (1bec). Once the
+    /// Harkonnen palace has fallen (ds:C2 >= 7) no troop or time-of-day
+    /// event runs any more (seg000:1b5e).
     func runPeriod() {
         let troopEvents = b(0xC2) < 7
         if troopEvents {
             for id in 1..<World.troopCount where troopExists(id) {
                 let occupation = troopByte(id, 3)
-                if occupation & 0x40 != 0 { continue }            // marching: not ported
+                // seg000:6c92-6ceb: a marching troop travels (6ced -> 8308).
+                if occupation & 0x40 != 0 {
+                    if occupation & 0xA0 == 0 || troopWord(id, 0x12) & 0x430 != 0 { troopTravelStep(id) }
+                    continue
+                }
                 if troopWord(id, 0x12) & 0x430 != 0 {
                     if b(0xFA) == 0 { continue }
                     setTroopByte(id, 0x12, troopByte(id, 0x12) & 0xCF)
@@ -240,10 +256,16 @@ extension World {
                 }
                 if occupation & 0xA0 != 0 { continue }
                 guard let index = troopPlace(id) else { continue }
+                let harkonnen = troopByte(id, 0x10) & 0x80 != 0
                 switch occupation & 0x0F {
+                case TroopJob.militaryTraining: if !harkonnen { militaryTraining(id, index) }
+                case TroopJob.espionage: if !harkonnen { espionageTick(id, index) }
+                case TroopJob.attacking: if !harkonnen && occupation & TroopJob.stopped == 0 { attackTick(id, index) }
                 case TroopJob.spiceMining: mineSpice(id, index)
                 case TroopJob.prospecting: prospect(id, index)
-                default: break                                   // training, espionage, attacks, ecology: not ported
+                case TroopJob.irrigation, TroopJob.windTrap, TroopJob.bulbGrowing:
+                    if !harkonnen { runEcologyJob(id, index) }
+                default: break
                 }
             }
         }
@@ -263,6 +285,10 @@ extension World {
                 if men >= 1 && men < 200 { setTroopByte(id, 26, men + 1) }
             }
         }
+        if hour == 0 { ecologyNewDay() } // seg000:63f0
+        // seg000:1b86 re-stages the current place for the conditions (331e,
+        // not ported); ds:60, its Fremen troop count, feeds the battles.
+        stageFremenCount(currentLocation)
         if hour == 0 {
             // New day (seg000:1c46): Harkonnen production and today's spice.
             var sum = 0
@@ -277,6 +303,7 @@ extension World {
             setW(0xA6, stock >= w(0x1170) ? stock - w(0x1170) : 0)
             setW(0x1170, stock)
         }
+        battlePeriodStep() // night_attack_period_step (seg000:1bec)
     }
 
     /// The executable's random word at ds:0; its generator is not

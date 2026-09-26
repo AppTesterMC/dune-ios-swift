@@ -239,6 +239,14 @@ final class World {
     var pendingEnding: Int?
     /// Mining's carried remainder under 10 kg (ds:46e1, outside the save).
     var harvestRemainder = 0
+    /// rand (seg000:e3cc) and rand_masked (e3b7) states, ds:d826 / ds:d824:
+    /// outside the save and seeded from the clock (seg000:00c3), so a
+    /// reload rerolls every battle (Battles.swift).
+    var rngA: UInt16 = 1
+    var rngB: UInt16 = 1
+    /// The new day's vegetation walk keeps its shift register in the code
+    /// segment (cs:65b4, 1 at start), unsaved (Ecology.swift).
+    var ecologyLfsr: UInt16 = 1
     private(set) var pointerTable = 0
 
     private let logger = DuneEngine.shared.logger
@@ -250,6 +258,7 @@ final class World {
 
     private init() {
         load()
+        seedRandom()
     }
 
 
@@ -373,6 +382,8 @@ final class World {
     func reset() {
         if !initialVars.isEmpty {
             vars = initialVars
+            harvestRemainder = 0
+            prepareNewGame()
         }
     }
 
@@ -814,18 +825,17 @@ final class World {
 
     // MARK: The live map
 
-    /// MAP.HSQ with the stage bits the game changes (ecology, saves) and
-    /// bit 6 set on every place's cell.
-    private(set) lazy var map: [UInt8] = {
-        var cells = Resource("MAP.HSQ").unpackedData
-        if cells.count < MapRenderer.mapSize {
-            cells += [UInt8](repeating: 0, count: MapRenderer.mapSize - cells.count)
-        }
-        return cells
-    }()
+    /// MAP.HSQ with the stage bits the game changes (ecology, battles,
+    /// saves) and bit 6 set on every place's cell: 0x10 vegetation, 0x20
+    /// Atreides, 0x30 Harkonnen area. Ecology.swift changes it.
+    lazy var map: [UInt8] = freshMap()
+
+    /// TABLAT.BIN: 8 bytes per latitude row 0...98 (big-endian offset and
+    /// half-length).
+    private(set) lazy var tablat: [UInt8] = Resource("TABLAT.BIN", uncompressed: true).unpackedData
 
     private(set) lazy var mapRenderer: MapRenderer = {
-        MapRenderer(map: { [unowned self] in self.map }, tablat: Resource("TABLAT.BIN", uncompressed: true).unpackedData)
+        MapRenderer(map: { [unowned self] in self.map }, tablat: tablat)
     }()
 
     /// Distance in map cells, as travel counts it:

@@ -199,6 +199,11 @@ final class Conversation {
         let bit: UInt16 = character < 16 ? UInt16(1) << UInt16(character) : 0
         world.setW(0x0E, world.w(0x0E) | bit)
         world.setW(0x14, bit)
+        if character == World.thufir {
+            world.thufirSpeaks() // seg000:9f40: the final attack's stage 5
+        } else if character == World.captain {
+            world.prepareCaptain() // seg000:932e: the fort he knows of
+        }
     }
 
     /// The next page to show, or nil when the conversation is over.
@@ -408,6 +413,10 @@ final class Story {
             let closing = world.duncanClosing()
             world.addSighting(closing.sighting)
             if closing.endTalk { conversation.endAfterLine() }
+        case 8 where speaker == World.stilgar:
+            world.stilgarWaterOfLife() // seg000:2ccf; a death sets pendingEnding 176
+        case 9 where speaker == World.stilgar:
+            world.finalAttackTroops() // seg000:2d2c
         case 8 where speaker == World.captain:
             // Character 12 shows the hidden place whose pointer is at ds:11CE.
             let pointer = Int(world.w(0x11CE))

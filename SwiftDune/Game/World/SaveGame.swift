@@ -10,8 +10,9 @@
 //    DIALOGUE.HSQ with its said flags           4,464 bytes (floppy)
 //    the data segment vars[0 ..< savedSize]     0x126E floppy
 //
-//  Port of the ScummVM Dune engine's saves.cpp. The flat map is not ported
-//  yet, so the stage bits are kept as loaded and written back unchanged.
+//  Port of the ScummVM Dune engine's saves.cpp. The stage bits are the
+//  live map's (World.map, Ecology.swift): a load puts them back into each
+//  cell as (cell & 0xCF) | bits << 4 and marks the places' cells again.
 //  Slots load from Documents first (games saved on this device), then from
 //  the game folder (the five saves shipped with the floppy release).
 //
@@ -27,7 +28,6 @@ final class SaveGame {
 
     private let world = World.shared
     private let story = Story.shared
-    private var mapFlags = [UInt8](repeating: 0, count: SaveGame.mapFlagBytes)
     private var extra: [UInt8] = []
 
     private init() {}
@@ -111,11 +111,19 @@ final class SaveGame {
             DuneEngine.shared.logger.log(.error, "Saves: slot \(slot) holds \(body.count) bytes, \(expected) expected")
             return false
         }
-        var p = 0
-        mapFlags = Array(body[p..<(p + SaveGame.mapFlagBytes)]); p += SaveGame.mapFlagBytes
+        var p = SaveGame.mapFlagBytes
         extra = Array(body[p..<(p + extraSize)]); p += extraSize
         story.dialogue.setData(Array(body[p..<(p + dialogueSize)])); p += dialogueSize
         world.restore(Array(body[p..<(p + savedSize)]))
+        // The map's flag bits, four cells to a byte, first cell in the top
+        // bits (sub_1B427); restore() has reset the map to MAP.HSQ.
+        for i in 0..<SaveGame.mapFlagBytes {
+            for k in 0..<4 where 4 * i + k < world.map.count {
+                let cell = 4 * i + k
+                world.map[cell] = (world.map[cell] & 0xCF) | ((body[i] >> (6 - 2 * k)) & 3) << 4
+            }
+        }
+        world.markPlaceCells()
         story.rebuildNotebook()
         DuneEngine.shared.logger.log(.info, "Saves: slot \(slot) loaded, time \(world.w(World.gameTime)), place \(world.currentLocation) room \(world.room), phase \(String(world.b(World.phase), radix: 16))")
         return true
@@ -123,7 +131,12 @@ final class SaveGame {
 
     @discardableResult
     func save(_ slot: Int) -> Bool {
-        var body = mapFlags
+        var body = [UInt8](repeating: 0, count: SaveGame.mapFlagBytes)
+        for i in 0..<SaveGame.mapFlagBytes {
+            for k in 0..<4 where 4 * i + k < world.map.count {
+                body[i] |= ((world.map[4 * i + k] >> 4) & 3) << (6 - 2 * k)
+            }
+        }
         body += extra.count == extraSize ? extra : [UInt8](repeating: 0, count: extraSize)
         body += story.dialogue.data
         body += world.vars[0..<savedSize]
