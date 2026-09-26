@@ -87,6 +87,7 @@
 		FB4777E517F1790C25B275FA /* OPL3Operator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 495E8D1A298936E97E9357AA /* OPL3Operator.swift */; };
 		FC030C6E0D93E68700834DA5 /* SpriteAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3B911A28F0BBD8BF4D86BA /* SpriteAnimation.swift */; };
 		FD89E79697094D65D8D768E2 /* Music.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1B92319AA70E511EFB90AD /* Music.swift */; };
+		FE47D82F7D81098D156EC83A /* MusicSituation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B17CEA2728E8C68CC7FBD6 /* MusicSituation.swift */; };
 		FEFA52DAF68263A524CA88D2 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74EEB4985D34BB840F532794 /* AudioPlayer.swift */; };
 /* End PBXBuildFile section */
 
@@ -122,6 +123,7 @@
 		677040991DC38FD2DF88EF50 /* UI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI.swift; sourceTree = "<group>"; };
 		6D7E1DCC17CB01DA10832866 /* DialogueOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogueOverlay.swift; sourceTree = "<group>"; };
 		74EEB4985D34BB840F532794 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
+		79B17CEA2728E8C68CC7FBD6 /* MusicSituation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSituation.swift; sourceTree = "<group>"; };
 		7B0C71306981EBCB8273987E /* Prologue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Prologue.swift; sourceTree = "<group>"; };
 		7C29FD2E9E41E5486D49300E /* GameTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameTypes.swift; sourceTree = "<group>"; };
 		7D3B911A28F0BBD8BF4D86BA /* SpriteAnimation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpriteAnimation.swift; sourceTree = "<group>"; };
@@ -252,6 +254,7 @@
 				DB3B70E87F231AB33831B982 /* Dialogue.swift */,
 				7DBAADC5F5BE640A1807A779 /* GameText.swift */,
 				44D01507F2978E1BE26413C5 /* MapRenderer.swift */,
+				79B17CEA2728E8C68CC7FBD6 /* MusicSituation.swift */,
 				EDE3FE4D2EF8DCE517899DA2 /* SaveGame.swift */,
 				C86E21DFF133C0BBA0418642 /* Shipments.swift */,
 				ED848A62BEDC228B03CCABC5 /* Troops.swift */,
@@ -483,6 +486,7 @@
 				BAE2A0525B3ECDC648B81B3B /* Math.swift in Sources */,
 				BC050C6B70287CA6375E8F8E /* Mouse.swift in Sources */,
 				FD89E79697094D65D8D768E2 /* Music.swift in Sources */,
+				FE47D82F7D81098D156EC83A /* MusicSituation.swift in Sources */,
 				29B101B77EF024BAE198EEBD /* Node.swift in Sources */,
 				66731D85B95041DC86BF4FA7 /* OPL3Channel.swift in Sources */,
 				230FEA7B60A2A21000419D7D /* OPL3Chip.swift in Sources */,

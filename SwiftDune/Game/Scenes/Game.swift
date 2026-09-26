@@ -50,6 +50,8 @@ final class Game: DuneNode {
 
     private var sietchMenuMode: SietchMenuMode = .root
     private var musicStarted = false
+    /// The song playing (MusicSituation decides).
+    private var currentSong: String?
     private var desertActive = false
     private var sietchActive = false
     /// The flat map is open (SEE DUNE MAP, or choosing where to fly).
@@ -92,6 +94,7 @@ final class Game: DuneNode {
       dialogueContext = .palace
       dialoguePhraseOverride = nil
       musicStarted = false
+      currentSong = nil
       desertActive = false
       sietchActive = false
       sietchMenuMode = .root
@@ -130,11 +133,7 @@ final class Game: DuneNode {
     }
   
     func showRoom() {
-        if !musicStarted {
-            let music = Music("ARRAKIS.HSQ", player: engine.audioPlayer)
-            engine.audioPlayer.play(music)
-            musicStarted = true
-        }
+        updateMusic()
 
         guard let record = world.currentRoomRecord() else {
             engine.logger.log(.error, "showRoom(): no room \(currentGameRoom) for place type \(world.placeType)")
@@ -472,6 +471,25 @@ final class Game: DuneNode {
         case .worm:
             break
         }
+    }
+
+
+    // MARK: - Music
+
+    /// The game-relative jukebox (seg000:ad5e): the situation's song; a
+    /// forced one switches at once, a queued one only when nothing plays yet.
+    private func updateMusic() {
+        var screen = MusicSituation.Screen()
+        screen.talking = conversation != nil || dialogueCharacter != nil
+        screen.ending = isOverlayActive("Ending")
+        screen.globe = isOverlayActive("Fresk")
+        screen.map = mapActive
+        screen.vision = dreaming
+        screen.travelling = flight != nil || inDesert
+        guard let song = MusicSituation.song(screen, world), song.name != currentSong else { return }
+        if !song.forced && currentSong != nil { return }
+        currentSong = song.name
+        engine.audioPlayer.play(Music(song.name, player: engine.audioPlayer))
     }
 
 
@@ -1382,6 +1400,7 @@ final class Game: DuneNode {
             arrive()
         }
         checkIdle(elapsedTime)
+        updateMusic()
         if let ending = world.pendingEnding, !isOverlayActive("Ending") {
             showEnding(ending)
         }
