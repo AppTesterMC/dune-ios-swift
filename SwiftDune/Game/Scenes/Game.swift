@@ -419,13 +419,13 @@ final class Game: DuneNode {
     /// Land: the place is discovered, Paul in its room 1 with one more
     /// ornithopter, a period per 16 cells has passed, then the room-entry
     /// lines.
-    private func arrive() {
+    private func arrive(periods: Int? = nil) {
         guard let trip = flight else { return }
         flight = nil
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
         setNodeActive("FlightLandscape", false)
-        gameState.passPeriods(trip.cells / 16)
+        gameState.passPeriods(periods ?? trip.cells / 16) // a period every 16 steps
         if trip.destination < 0, let point = flightPoint {
             landInDesert(point)
             return
@@ -1496,8 +1496,14 @@ final class Game: DuneNode {
             gameState.advance(elapsedTime)
         }
         clock += elapsedTime
-        if let flight = flight, clock >= flight.arrival {
-            arrive()
+        if let flight = flight {
+            // The route lands when its cell is the destination's (the
+            // landscape flies it); the timer stays as a fallback.
+            if let landscape = findNode("FlightLandscape") as? FlightLandscape, landscape.isActive, landscape.arrived {
+                arrive(periods: landscape.steps / 16)
+            } else if clock >= flight.arrival + 10 {
+                arrive()
+            }
         }
         checkIdle(elapsedTime)
         updateMusic()
