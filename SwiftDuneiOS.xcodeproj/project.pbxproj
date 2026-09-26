@@ -86,6 +86,7 @@
 		EEC75A45C38262B56CC9F8EF /* OPL3Tables.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2879BC83E156C3D5F7EEF849 /* OPL3Tables.swift */; };
 		F22A9CFEE9CF127DA51AB79E /* World.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41386BC22871F9E97BBE2687 /* World.swift */; };
 		F3D4FDFA69755ACE02B18F9B /* Ornithopter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B4E8DACA2FBB8C179ECD664 /* Ornithopter.swift */; };
+		F62E393B6A8921885F734C02 /* FlightLandscape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92127383EBC7C63BA54D0481 /* FlightLandscape.swift */; };
 		FB4777E517F1790C25B275FA /* OPL3Operator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 495E8D1A298936E97E9357AA /* OPL3Operator.swift */; };
 		FC030C6E0D93E68700834DA5 /* SpriteAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3B911A28F0BBD8BF4D86BA /* SpriteAnimation.swift */; };
 		FD89E79697094D65D8D768E2 /* Music.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1B92319AA70E511EFB90AD /* Music.swift */; };
@@ -138,6 +139,7 @@
 		877A9ECC2E6BF76E58F7BA61 /* Globe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Globe.swift; sourceTree = "<group>"; };
 		88147B6DDD57BAA6F60A6727 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		91936B84BCC6E58226B1D3BF /* PrologueSubtitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrologueSubtitle.swift; sourceTree = "<group>"; };
+		92127383EBC7C63BA54D0481 /* FlightLandscape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightLandscape.swift; sourceTree = "<group>"; };
 		95925049A8B64C75E04B148D /* DuneFiles */ = {isa = PBXFileReference; lastKnownFileType = folder; path = DuneFiles; sourceTree = SOURCE_ROOT; };
 		95B81D2038E35642788D4E84 /* Resource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Resource.swift; sourceTree = "<group>"; };
 		966DD802EC142B64CE737FE9 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
@@ -197,6 +199,7 @@
 				4353B53E70AE12D216242FE5 /* DuneTitle.swift */,
 				A424E2236B26FE1AA258106C /* FlatMap.swift */,
 				159E74011B9FCF456A792355 /* Flight.swift */,
+				92127383EBC7C63BA54D0481 /* FlightLandscape.swift */,
 				A3BD8F93438D063F4396E68C /* Fresk.swift */,
 				966DD802EC142B64CE737FE9 /* Game.swift */,
 				49785BB76D2B4F6FD6D92487 /* Intro.swift */,
@@ -476,6 +479,7 @@
 				8BF55510EC2D3A6ECCB014BD /* Event.swift in Sources */,
 				9A68E05B56A4A12A8832A35A /* FlatMap.swift in Sources */,
 				A824394E8789098F999E6CCC /* Flight.swift in Sources */,
+				F62E393B6A8921885F734C02 /* FlightLandscape.swift in Sources */,
 				33E1C8A25F24C3DF8E13A32D /* Font.swift in Sources */,
 				B071C37828284FF2FE1EFAB9 /* Fresk.swift in Sources */,
 				6EA9FD66C72FC129D5B16E7D /* Game.swift in Sources */,

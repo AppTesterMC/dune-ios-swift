@@ -56,6 +56,9 @@ final class Game: DuneNode {
     private var sietchActive = false
     /// The flat map is open (SEE DUNE MAP, or choosing where to fly).
     private var mapActive = false
+    /// The floppy's travel step: 8 landscape frames of 16 ticks (640 ms);
+    /// the CD's is 0x300 ticks (3.83 s).
+    private static let stepSeconds = 0.64
     /// Flying to a place (index) or to a desert point (-1): arrival time.
     private var flight: (destination: Int, cells: Int, arrival: TimeInterval)?
     private var flightPoint: (latitude: Int, longitude: UInt16)?
@@ -353,10 +356,10 @@ final class Game: DuneNode {
         let cells = world.cellDistance(fromLatitude: origin.latitude, longitude: origin.longitude,
                                        toLatitude: Int(to.latitude), longitude: to.longitude)
         leaveForFlight()
-        flight = (destination, cells, clock + Double(max(1, cells)) * 3.834)
+        flight = (destination, cells, clock + Double(max(1, cells)) * Game.stepSeconds)
         flightPoint = nil
         engine.logger.log(.info, "Flight: \(world.currentLocation) -> \(destination), \(cells) cells")
-        startFlightView(destination)
+        startFlightView(from: origin, to: (Int(to.latitude), to.longitude))
     }
 
     /// Where a flight starts: the place, or the desert point Paul stands on.
@@ -389,23 +392,22 @@ final class Game: DuneNode {
         let cells = world.cellDistance(fromLatitude: origin.latitude, longitude: origin.longitude,
                                        toLatitude: latitude, longitude: longitude)
         leaveForFlight()
-        flight = (-1, cells, clock + Double(max(1, cells)) * 3.834)
+        flight = (-1, cells, clock + Double(max(1, cells)) * Game.stepSeconds)
         flightPoint = (latitude, longitude)
         engine.logger.log(.info, "Flight: to the desert at \(longitude)/\(latitude), \(cells) cells")
-        startFlightView(-1)
+        startFlightView(from: origin, to: (latitude, longitude))
     }
 
-    private func startFlightView(_ destination: Int) {
-        // The floppy flight view: DUNES.HSQ pieces streaming from the
-        // horizon under the sky of the hour (Flight.swift, which the ScummVM
-        // engine's DesertFlight also follows).
-        if findNode("Flight") == nil { attachNode(Flight()) }
-        findNode("Flight")?.params = [
+    private func startFlightView(from: (latitude: Int, longitude: UInt16), to: (latitude: Int, longitude: UInt16)) {
+        // The floppy flight view (FlightLandscape): DUNES.HSQ objects in
+        // perspective, seeded from the map cells of the route ahead.
+        if findNode("FlightLandscape") == nil { attachNode(FlightLandscape()) }
+        setNodeActive("FlightLandscape", true, .background)
+        findNode("FlightLandscape")?.params = [
             "dayMode": gameState.phase.lightMode,
-            "destinationCode": destination,
-            "duration": TimeInterval.greatestFiniteMagnitude
+            "from": (from.longitude, from.latitude),
+            "to": (to.longitude, to.latitude)
         ]
-        setNodeActive("Flight", true, .background)
         var items: [UInt16] = []
         if let skip = GameText.shared.findCommand("SKIP TO DESTINATION") { items.append(UInt16(skip)) }
         if let change = GameText.shared.findCommand("CHANGE DESTINATION") { items.append(UInt16(change)) }
@@ -422,6 +424,7 @@ final class Game: DuneNode {
         flight = nil
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
+        setNodeActive("FlightLandscape", false)
         gameState.passPeriods(trip.cells / 16)
         if trip.destination < 0, let point = flightPoint {
             landInDesert(point)
@@ -780,6 +783,7 @@ final class Game: DuneNode {
         desertActive = false
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
+        setNodeActive("FlightLandscape", false)
         showRoom()
         setNodeActive("UI", true, .foreground)
         publishMainUI()
@@ -808,6 +812,7 @@ final class Game: DuneNode {
         setNodeActive("Palace", false)
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
+        setNodeActive("FlightLandscape", false)
         setNodeActive("Sietch", true, .background)
         setNodeActive("UI", true, .foreground)
         publishSietchUI(items: sietchRootCharacterItems())
