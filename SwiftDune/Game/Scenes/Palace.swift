@@ -43,6 +43,9 @@ final class Palace: DuneNode {
     private var outdoor: Bool?
     /// CD: the arrival clip whose last frame is this outdoor room's backdrop.
     private var videoBackdrop: String?
+    /// Ornithopters parked on the pad of room 1 (count, pad position).
+    private var parked: (count: Int, pad: DunePoint) = (0, .zero)
+    private lazy var ornithopter = Sprite("ORNYTK.HSQ")
     /// Sheet from the room code (World.sheet(for:)); nil = legacy ranges.
     private var sheet: String?
     /// Character numbers in the room; placed with World.markerAssignment.
@@ -96,6 +99,21 @@ final class Palace: DuneNode {
     }
     
     
+    /// Parked ornithopters (ScummVM scene.cpp 1174-1242): up to three on
+    /// the pad, each further one 70 px right and 10 px lower; ORNYTK body 0,
+    /// hub 1 at +(6,30), legs 2 at +(4,50), wings 8 at +(-81,-3) (frame 0).
+    private func drawParkedOrnithopters(_ buffer: PixelBuffer) {
+        guard parked.count > 0, DuneArchive.path("ORNYTK.HSQ") != nil else { return }
+        for k in 0..<min(3, parked.count) {
+            let x = parked.pad.x + Int16(70 * k), y = parked.pad.y + Int16(10 * k)
+            ornithopter.drawFrame(8, x: x - 81, y: y - 3, buffer: buffer)
+            ornithopter.drawFrame(0, x: x, y: y, buffer: buffer)
+            ornithopter.drawFrame(1, x: x + 6, y: y + 30, buffer: buffer)
+            ornithopter.drawFrame(2, x: x + 4, y: y + 50, buffer: buffer)
+        }
+    }
+
+
     override func onDisable() {
         palaceScenery = nil
         sky = nil
@@ -105,6 +123,7 @@ final class Palace: DuneNode {
         salFile = "PALACE.SAL"
         outdoor = nil
         videoBackdrop = nil
+        parked = (0, .zero)
         sheet = nil
         people = nil
         cast = nil
@@ -149,6 +168,10 @@ final class Palace: DuneNode {
         }
         if params.keys.contains("outdoor") {
             outdoor = params["outdoor"] as? Bool
+        }
+        if let count = params["ornithopters"] as? Int, let pad = params["pad"] as? DunePoint {
+            parked = (count, pad)
+            contextBuffer.tag = 0
         }
         if params.keys.contains("videoBackdrop") {
             videoBackdrop = params["videoBackdrop"] as? String
@@ -267,6 +290,7 @@ final class Palace: DuneNode {
                     Primitives.fillRect(DuneRect(0, 78, 320, 74), 190, contextBuffer, isOffset: false)
                 }
                 palaceScenery.drawRoom(roomIndex, buffer: contextBuffer)
+                drawParkedOrnithopters(contextBuffer)
                 contextBuffer.tag = tag
             }
 

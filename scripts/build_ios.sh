@@ -70,7 +70,9 @@ cp -R "$app" "$stage/Payload/Dune.app"
 codesign --force --deep --sign - --timestamp=none "$stage/Payload/Dune.app"
 codesign --verify --deep --strict "$stage/Payload/Dune.app"
 
-ipa="$repo_root/builds/SwiftDune-ios$( (( cd_release )) && print -- -cd)-$stamp.ipa"
+suffix=""
+if (( cd_release )); then suffix=-cd; fi
+ipa="$repo_root/builds/SwiftDune-ios$suffix-$stamp.ipa"
 ditto -c -k --sequesterRsrc --keepParent "$stage/Payload" "$ipa"
 rm -rf "$stage"
 print "IPA=$ipa"
