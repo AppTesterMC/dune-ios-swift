@@ -29,7 +29,7 @@ scripts/build_ios.sh       # -> builds/SwiftDune-ios-<stamp>.ipa
 The script builds by `-target`/`-sdk iphoneos26.5` rather than with a
 `-destination`, because the "Any iOS Device" destination does not resolve on
 this Mac. The asset catalog (macOS icon) is excluded: `actool` refuses to run
-without an installed simulator runtime.
+without an installed simulator runtime, so the iOS target ships its icon as plain PNGs (`SwiftDune/Platform/iOS/Icons`, listed under `CFBundleIcons`) and needs no asset catalog.
 
 Install on the test phone (iPhone15,2, iOS 16.4.1) by sideloading: serve the
 IPA over HTTP and install it from the phone.
