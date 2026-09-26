@@ -160,7 +160,9 @@ final class Game: DuneNode {
             "outdoor": world.isOutdoors(record, placeType: world.placeType),
             // CD: outdoor rooms (not the palace balcony, SAL 10) are the
             // arrival clip's last picture (ScummVM composeView).
-            "videoBackdrop": cdVideoBackdrop(record) as Any
+            "videoBackdrop": cdVideoBackdrop(record) as Any,
+            "ornithopters": parkedOrnithopters(),
+            "pad": world.placeType <= Location.sietchMax ? DunePoint(149, 57) : DunePoint(202, 73)
         ]
         var params = roomParams
         if let dialogueCharacter = dialogueCharacter {
@@ -180,6 +182,15 @@ final class Game: DuneNode {
         }
     }
 
+
+    /// Room 1 shows the place's ornithopters, the palace always at least one.
+    private func parkedOrnithopters() -> Int {
+        // CD only for now: the floppy's ORNYTK colours are not recovered
+        // (it has no palette of its own).
+        guard world.room == 1, !world.isFloppy else { return 0 }
+        let count = Int(world.location(world.currentLocation).ornithopters)
+        return world.placeType == Location.palace ? max(1, count) : count
+    }
 
     private func cdVideoBackdrop(_ record: RoomRecord) -> String? {
         guard !world.isFloppy, world.isOutdoors(record, placeType: world.placeType),
