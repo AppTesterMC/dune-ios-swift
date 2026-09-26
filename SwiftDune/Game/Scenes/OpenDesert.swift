@@ -44,6 +44,7 @@ final class VisionDream: DuneNode {
     private var vision: Sprite?
     private var portrait: Sprite?
     private let picture = PixelBuffer(width: 320, height: 152)
+    private let sky = Sky()
 
     init() {
         super.init("VisionDream")
@@ -72,6 +73,18 @@ final class VisionDream: DuneNode {
     override func render(_ buffer: PixelBuffer) {
         guard let vision = vision else { return }
         picture.clearBuffer()
+        // The floppy's VIS frame is only wisps of cloud (4-bit, offset 127);
+        // its palette's other colours (to 207) tint the sky tiles drawn
+        // behind them. (A reading of the data; the dream routine at
+        // seg000:2bd2 is not decoded. The CD's VIS is a full 8-bit picture.)
+        sky.render(picture, width: 320, at: 0, type: .narrow, gameplayPalette: true)
+        sky.render(picture, width: 320, at: 0, type: .large, gameplayPalette: true)
+        // The large sky ends above the panel; its lowest coloured row runs down.
+        var horizon = 119
+        while horizon > 0 && picture.rawPointer[horizon * picture.width + 160] == 0 { horizon -= 1 }
+        for y in (horizon + 1)..<152 {
+            (picture.rawPointer + y * picture.width).update(from: picture.rawPointer + horizon * picture.width, count: picture.width)
+        }
         vision.setPalette()
         vision.drawFrame(0, x: 0, y: 0, buffer: picture)
         // VIS.HSQ's colours (128-207) must survive the balloon's and the
