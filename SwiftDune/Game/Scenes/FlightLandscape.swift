@@ -81,6 +81,11 @@ final class FlightLandscape: DuneNode {
     private var sky: Sky?
     private var dunesData: [UInt8] = []
     private var dunesSprite: Sprite?
+    private var onmap: Sprite?
+    private var icons: Sprite?
+    private let fullMap = PixelBuffer(width: 320, height: 152)
+    /// The last 23 positions (travel_trail_ring) for the minimap.
+    private var trail: [(longitude: UInt16, latitude: Int)] = []
     private var frames: [Int: LandFrame] = [:]
 
     private struct Object { var z: Int; var x: Int; var sprite: Int }
@@ -118,12 +123,17 @@ final class FlightLandscape: DuneNode {
         sky = Sky()
         dunesData = Resource("DUNES.HSQ").unpackedData
         dunesSprite = Sprite("DUNES.HSQ")
+        onmap = Sprite("ONMAP.HSQ")
+        icons = Sprite("ICONES.HSQ")
     }
 
     override func onDisable() {
         sky = nil
         dunesSprite = nil
+        onmap = nil
+        icons = nil
         objects = []
+        trail = []
     }
 
     /// Params: "from" and "to" as (longitude, latitude) pairs.
@@ -233,6 +243,8 @@ final class FlightLandscape: DuneNode {
         frameCount += 1
         if frameCount % FlightLandscape.framesPerStep == 0 {
             heading = headingTo(longitude, latitudeFix >> 8, destination.longitude, destination.latitude)
+            trail.append((longitude, latitudeFix >> 8))
+            if trail.count > 23 { trail.removeFirst() }
             advance(&longitude, &latitudeFix, &heading)
             var lng = longitude, latFix = latitudeFix, head = heading
             for _ in 0..<5 { advance(&lng, &latFix, &head) }
@@ -287,8 +299,47 @@ final class FlightLandscape: DuneNode {
         }
     }
 
+    /// The minimap (travel_minimap_setup; ScummVM MapScreen::drawMinimap):
+    /// the flat map around Paul in the box (202,3)-(318,61), filled 0xFC
+    /// with a 0xFA frame, the trail (ICONES 0x2F) and Paul (0x30).
+    private func drawMinimap(_ buffer: PixelBuffer) {
+        let renderer = world.mapRenderer
+        let lat = latitudeFix >> 8
+        let viewLat = min(max(lat - 18, -75), 75)
+        fullMap.clearBuffer()
+        renderer.draw(fullMap, latitude: viewLat, longitude: longitude)
+        let centre = renderer.project(latitude: viewLat, longitude: longitude, placeLatitude: lat, placeLongitude: longitude)
+            ?? DunePoint(160, 76)
+        let box = (x: 202, y: 3, w: 116, h: 58)
+        let w = box.w - 4, h = box.h - 4
+        let sx = min(max(Int(centre.x) - w / 2, 4), 316 - w), sy = min(max(Int(centre.y) - h / 2, 4), 148 - h)
+        Primitives.fillRect(DuneRect(Int16(box.x), Int16(box.y), UInt16(box.w), UInt8(box.h)), 0xFC, buffer, isOffset: false)
+        Primitives.drawLine(DunePoint(Int16(box.x + 1), Int16(box.y + 1)), DunePoint(Int16(box.x + box.w - 2), Int16(box.y + 1)), 0xFA, buffer, isOffset: false)
+        Primitives.drawLine(DunePoint(Int16(box.x + 1), Int16(box.y + box.h - 2)), DunePoint(Int16(box.x + box.w - 2), Int16(box.y + box.h - 2)), 0xFA, buffer, isOffset: false)
+        Primitives.drawLine(DunePoint(Int16(box.x + 1), Int16(box.y + 1)), DunePoint(Int16(box.x + 1), Int16(box.y + box.h - 2)), 0xFA, buffer, isOffset: false)
+        Primitives.drawLine(DunePoint(Int16(box.x + box.w - 2), Int16(box.y + 1)), DunePoint(Int16(box.x + box.w - 2), Int16(box.y + box.h - 2)), 0xFA, buffer, isOffset: false)
+        for y in 0..<h {
+            for x in 0..<w {
+                buffer.rawPointer[(box.y + 2 + y) * buffer.width + box.x + 2 + x] = fullMap.rawPointer[(sy + y) * fullMap.width + sx + x]
+            }
+        }
+        guard let icons = icons else { return }
+        for point in trail {
+            if let p = renderer.project(latitude: viewLat, longitude: longitude, placeLatitude: point.latitude, placeLongitude: point.longitude) {
+                let x = Int(p.x) + box.x + 2 - sx, y = Int(p.y) + box.y + 2 - sy
+                if x > box.x + 2 && x < box.x + box.w - 4 && y > box.y + 2 && y < box.y + box.h - 4 {
+                    icons.drawFrame(0x2F, x: Int16(x - 1), y: Int16(y - 1), buffer: buffer)
+                }
+            }
+        }
+        icons.drawFrame(0x30, x: Int16(Int(centre.x) + box.x + 2 - sx - 1), y: Int16(Int(centre.y) + box.y + 2 - sy - 1), buffer: buffer)
+    }
+
+
     override func render(_ buffer: PixelBuffer) {
         guard let sky = sky else { return }
+        // ONMAP's palette under the sky's: the minimap's terrain (0x10-0x1F).
+        onmap?.setPalette()
         sky.lightMode = dayMode
         sky.render(buffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
         Primitives.fillRect(DuneRect(0, Int16(FlightLandscape.horizon), 320, UInt8(152 - FlightLandscape.horizon)),
@@ -296,5 +347,6 @@ final class FlightLandscape: DuneNode {
         // The pieces use the sky's colours (the engine sets no DUNES palette
         // in flight). The far rows first: new rows are appended last.
         for o in objects.reversed() { draw(o, buffer) }
+        drawMinimap(buffer)
     }
 }
