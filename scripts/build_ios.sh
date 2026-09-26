@@ -34,12 +34,22 @@ fi
 
 cd "$repo_root"
 xcodegen generate --spec project-ios.yml --quiet
+# The generated project and Info.plist are tracked: put the floppy defaults
+# back once a CD build is done.
+restore_defaults() {
+  (( cd_release )) && DUNE_DATA=DuneFiles DUNE_APP_NAME=Dune DUNE_BUNDLE_ID=com.apptestermc.swiftdune \
+    xcodegen generate --spec project-ios.yml --quiet
+  return 0
+}
+trap restore_defaults EXIT
 
 if [[ "$mode" == sim ]]; then
-  xcodebuild -project SwiftDuneiOS.xcodeproj -target DuneiOS -configuration Debug \
+  # Optimised like the device build: the CD's video decoding is far too
+  # slow unoptimised.
+  xcodebuild -project SwiftDuneiOS.xcodeproj -target DuneiOS -configuration Release \
     -sdk iphonesimulator ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
-    SYMROOT="$derived/Build/Products" OBJROOT="$derived/Build/Intermediates" build -quiet
-  print "APP=$derived/Build/Products/Debug-iphonesimulator/Dune.app"
+    SYMROOT="$derived/Build/Products" OBJROOT="$derived/Build/Intermediates" CODE_SIGNING_ALLOWED=NO build -quiet
+  print "APP=$derived/Build/Products/Release-iphonesimulator/Dune.app"
   exit 0
 fi
 

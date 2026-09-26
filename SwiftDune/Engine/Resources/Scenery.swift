@@ -81,12 +81,16 @@ struct RoomMarker: RoomCommandProtocol {
 
 
 struct RoomSpriteIndices {
-    var sprite: Sprite
+    let name: String
+    private let loaded: Sprite?
+    var sprite: Sprite { loaded! }
     var indexStart: Int
     var indexEnd: Int
     
     init(_ spriteName: String, _ indexStart: Int, _ indexEnd: Int) {
-        self.sprite = Sprite(spriteName)
+        self.name = spriteName
+        // Loaded only when the file exists (the CD lacks SIET0, VILG, FORT).
+        self.loaded = DuneArchive.path(spriteName) != nil ? Sprite(spriteName) : nil
         self.indexStart = indexStart
         self.indexEnd = indexEnd
     }
@@ -168,6 +172,9 @@ final class Scenery {
         }
 
         
+        // The CD lacks some floppy sheets (SIET0, VILG, FORT): its rooms name
+        // their sheet through World.sheet(for:) (sheetOverride) instead.
+        spriteIndices = spriteIndices.filter { DuneArchive.path($0.name) != nil }
         parseRooms()
     }
     

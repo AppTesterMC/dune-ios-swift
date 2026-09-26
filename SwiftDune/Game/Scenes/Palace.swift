@@ -261,7 +261,7 @@ final class Palace: DuneNode {
                 } else {
                     sky.render(contextBuffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
                 }
-                if !inPalace {
+                if !inPalace && videoBackdrop == nil {
                     // Outside the palace the ground under the horizon is
                     // colour 190 (ScummVM composeView).
                     Primitives.fillRect(DuneRect(0, 78, 320, 74), 190, contextBuffer, isOffset: false)
@@ -312,8 +312,10 @@ final class Palace: DuneNode {
         if gameRoomID == nil && (currentRoom == .porch || currentRoom == .balcony || currentRoom == .stairs) {
             sky.setPalette()
         } else if videoBackdrop != nil {
-            // CD: SKYDN.HSQ's record of the hour colours the clip (73-239).
+            // CD: SKYDN.HSQ's record of the hour colours the clip (73-239),
+            // then the interface's colours over it (PERS: 1-15, 224-239).
             HnmPlayer.applySkyRecord(for: GameState.shared.phase.lightMode)
+            palaceScenery.setCharacterPalette()
         } else if isGameplayExterior {
             // Outdoor sheets have no palette of their own for 128-222: they
             // use the sky's, for the current period (FINDINGS, room drawing).

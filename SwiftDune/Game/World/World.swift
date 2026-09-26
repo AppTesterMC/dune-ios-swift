@@ -561,7 +561,9 @@ final class World {
     /// (SIET0, VILG, FORT).
     func isOutdoors(_ record: RoomRecord, placeType: UInt8) -> Bool {
         if placeType == Location.palace { return record.salRoom == 10 || record.salRoom == 11 }
-        return [6, 8, 9].contains(record.sheetSlot)
+        // The floppy's exterior sheets SIET0, VILG, FORT (slots 6, 8, 9);
+        // the CD's GENERIC (slot 0), whose backdrop is the arrival clip.
+        return isFloppy ? [6, 8, 9].contains(record.sheetSlot) : record.sheetSlot == 0
     }
 
 

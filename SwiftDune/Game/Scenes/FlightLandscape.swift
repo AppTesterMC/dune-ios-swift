@@ -144,8 +144,11 @@ final class FlightLandscape: DuneNode {
             clips.first?.step()
         }
         sky = Sky()
-        dunesData = Resource("DUNES.HSQ").unpackedData
-        dunesSprite = Sprite("DUNES.HSQ")
+        if !isCD {
+            // The floppy's landscape sheet (the CD has none: it plays MNT clips).
+            dunesData = Resource("DUNES.HSQ").unpackedData
+            dunesSprite = Sprite("DUNES.HSQ")
+        }
         onmap = Sprite("ONMAP.HSQ")
         icons = Sprite("ICONES.HSQ")
     }

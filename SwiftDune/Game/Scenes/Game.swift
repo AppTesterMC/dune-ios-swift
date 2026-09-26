@@ -2118,6 +2118,7 @@ final class Game: DuneNode {
     private func moveRoom(_ direction: RoomDirection) {
         dialogueCharacter = nil
         guard let exits = world.currentRoomRecord()?.exits else { return }
+        engine.logger.log(.info, "Room: move \(direction) from room \(world.room) -> exit \(exits[direction.rawValue])")
 
         switch RoomRecord.decode(exits[direction.rawValue]) {
         case .room(let room):
