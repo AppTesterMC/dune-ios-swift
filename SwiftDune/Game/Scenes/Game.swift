@@ -504,6 +504,7 @@ final class Game: DuneNode {
         dreaming = dream
         if dream {
             if findNode("VisionDream") == nil { attachNode(VisionDream()) }
+            findNode("VisionDream")?.params = ["character": duneCharacter(number: Int(sender)) ?? DuneCharacter.none]
             setNodeActive("VisionDream", true, .foreground)
         } else if let speaker = duneCharacter(number: Int(sender)) {
             dialogueCharacter = speaker

@@ -17,6 +17,9 @@ class SpriteFrameInfo {
     var height: UInt16 = 0
     var bytesPerRow: UInt16 = 0
     var paletteOffset: UInt8 = 0
+    /// Palette offset 254/255 marks an 8-bit frame (255: colour 0 is
+    /// transparent), e.g. VIS.HSQ's dream backdrop (dune-rust blit.rs).
+    var eightBit: Bool { paletteOffset >= 254 }
     var paletteIndices: UnsafeMutablePointer<UInt8>
     
     init(_ bufferSize: Int) {
@@ -312,7 +315,9 @@ final class Sprite: Equatable {
                 resource.stream!.skip(2)
             }
             
-            if !frameInfo.isCompressed {
+            if frameInfo.eightBit {
+                compute8bpp(frameInfo)
+            } else if !frameInfo.isCompressed {
                 compute4bpp(frameInfo)
             } else {
                 compute4bppRLE(frameInfo)
@@ -510,6 +515,17 @@ final class Sprite: Equatable {
                 let srcIndex = yScaled + Int(CGFloat(xDelta) / scaleRatio)
                 var paletteIndex = frameInfo.paletteIndices[srcIndex]
 
+                if frameInfo.eightBit {
+                    // Every byte is a colour; 0 is transparent only for 255.
+                    if paletteIndex == 0 && frameInfo.paletteOffset == 255 {
+                        i += 1
+                        continue
+                    }
+                    buffer.rawPointer[(flipY ? y2 - yDelta - 1 : j) * bufferWidth + (flipX ? x2 - xDelta - 1 : i)] = paletteIndex
+                    i += 1
+                    continue
+                }
+
                 if paletteIndex <= frameInfo.paletteOffset || paletteIndex == 0 {
                     i += 1
                     continue
@@ -537,6 +553,38 @@ final class Sprite: Equatable {
     }
     
     
+    /// 8-bit frames: one byte per pixel; compressed rows use the same RLE
+    /// (a byte >= 0x80 repeats the next byte 257 - n times, else n + 1
+    /// literal bytes follow) and never cross a row.
+    private func compute8bpp(_ frameInfo: SpriteFrameInfo) {
+        let width = Int(frameInfo.width)
+        let stream = resource.stream!
+        for line in 0..<Int(frameInfo.height) {
+            var column = 0
+            if !frameInfo.isCompressed {
+                for x in 0..<width { frameInfo.paletteIndices[line * width + x] = stream.readByte() }
+                continue
+            }
+            while column < width && !stream.isEOF() {
+                let command = stream.readByte()
+                if command & 0x80 != 0 {
+                    let value = stream.readByte()
+                    for _ in 0..<(257 - Int(command)) {
+                        if column < width { frameInfo.paletteIndices[line * width + column] = value }
+                        column += 1
+                    }
+                } else {
+                    for _ in 0..<(Int(command) + 1) {
+                        let value = stream.readByte()
+                        if column < width { frameInfo.paletteIndices[line * width + column] = value }
+                        column += 1
+                    }
+                }
+            }
+        }
+    }
+
+
     private func compute4bpp(_ frameInfo: SpriteFrameInfo) {
         var pixel: UInt8 = 0
         let paletteOffset = frameInfo.paletteOffset

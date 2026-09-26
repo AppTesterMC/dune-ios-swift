@@ -35,12 +35,14 @@ final class OpenDesert: DuneNode {
 }
 
 
-/// A vision dream: VIS.HSQ frame 0 behind the line (present_vision_dream,
-/// seg000:2bd2), wobbling. The original's wobble is not decoded; each row
+/// A vision dream: VIS.HSQ frame 0 (an 8-bit picture of pink clouds) behind
+/// the sender's bust and the line (present_vision_dream, seg000:2bd2; the
+/// speed-run recording shows Leto's bust for the first vision), wobbling. The original's wobble is not decoded; each row
 /// is shifted by a sine wave (6 px amplitude, 48-row wavelength, one cycle
 /// a second) as swift-dune's TODO describes the effect.
 final class VisionDream: DuneNode {
     private var vision: Sprite?
+    private var portrait: Sprite?
     private let picture = PixelBuffer(width: 320, height: 152)
 
     init() {
@@ -54,6 +56,13 @@ final class VisionDream: DuneNode {
 
     override func onDisable() {
         vision = nil
+        portrait = nil
+    }
+
+    override func onParamsChange() {
+        if let character = params["character"] as? DuneCharacter {
+            portrait = character == .none ? nil : Sprite(character.resourceName)
+        }
     }
 
     override func update(_ elapsedTime: TimeInterval) {
@@ -71,6 +80,10 @@ final class VisionDream: DuneNode {
                 let sx = min(max(x + shift, 0), 319)
                 buffer.rawPointer[y * buffer.width + x] = picture.rawPointer[y * picture.width + sx]
             }
+        }
+        if let portrait = portrait {
+            portrait.setPalette()
+            portrait.drawAnimation(0, buffer: buffer, time: 0)
         }
     }
 }

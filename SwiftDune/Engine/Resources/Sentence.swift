@@ -36,6 +36,10 @@ final class Sentence {
     
     
     func sentenceCount() -> UInt16 {
+        // The offset table's first entry, read from the start of the file
+        // (reading at the current position ran past the end after a
+        // sentence had been read: crash on the flat map's DUNE MAP box).
+        resource.stream!.seek(0)
         let firstSentence = resource.stream!.readUInt16LE();
         resource.stream!.seek(0)
         return (firstSentence / 2)
