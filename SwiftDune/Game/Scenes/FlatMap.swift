@@ -135,6 +135,7 @@ final class FlatMap: DuneNode {
             colour -= 2
         }
 
+        drawVegetation(buffer, icons)
         drawIcons(buffer, icons)
         if let point = point,
            let p = world.mapRenderer.project(latitude: latitude, longitude: longitude,
@@ -147,6 +148,30 @@ final class FlatMap: DuneNode {
             drawPopup(buffer, destination)
         } else if currentTime < captionUntil {
             drawInfoBox(buffer)
+        }
+    }
+
+
+    /// map_draw_vegetation_marks (seg000:633b): a tuft on every sprouting
+    /// cell ((cell & 0x30) == 0x10) in view, ONMAP 0x79 when the next cell
+    /// east sprouts too, else 0x78, jittered by the cell's offset.
+    private func drawVegetation(_ buffer: PixelBuffer, _ icons: Sprite) {
+        let cells = world.map
+        for lat in (latitude - 2)...(latitude + MapRenderer.viewRows + 2) where lat >= -98 && lat <= 98 {
+            guard let first = world.mapCell(longitude: 0, latitude: lat) else { continue }
+            let count = world.rowCells(lat)
+            for c in 0..<count {
+                let o = first + c
+                guard o < cells.count, cells[o] & 0x30 == 0x10 else { continue }
+                let lng = UInt16((UInt32(c) << 16) / UInt32(max(1, count)))
+                guard var p = world.mapRenderer.project(latitude: latitude, longitude: longitude,
+                                                        placeLatitude: lat, placeLongitude: lng) else { continue }
+                let eastToo = o + 1 < cells.count && cells[o + 1] & 0x30 == 0x10
+                p.x += Int16(o & 3) - 2
+                p.y += Int16((o >> 2) & 3) - 2
+                guard p.x >= 4 && p.x <= 312 && p.y >= 4 && p.y <= 144 else { continue }
+                icons.drawFrame(eastToo ? 0x79 : 0x78, x: p.x - 4, y: p.y - 4, buffer: buffer)
+            }
         }
     }
 
