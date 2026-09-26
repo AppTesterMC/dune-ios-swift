@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Build the iOS app and package a TrollStore-installable IPA.
+# Build the iOS app and package an ad-hoc signed IPA for sideloading.
 #
 #   scripts/build_ios.sh            # device IPA -> builds/SwiftDune-ios-<stamp>.ipa
 #   scripts/build_ios.sh sim        # simulator .app, printed as APP=...
@@ -8,7 +8,7 @@
 # the SMB volume disconnects and /private/tmp is wiped on reset. Derived data
 # lives in build/ (gitignored); finished IPAs are kept in builds/.
 # Signing: ad-hoc (codesign -s -), the same recipe the ScummVM port uses for
-# TrollStore on the iPhone15,2 / iOS 16.4.1 test device.
+# sideloading on the iPhone15,2 / iOS 16.4.1 test device.
 
 set -euo pipefail
 

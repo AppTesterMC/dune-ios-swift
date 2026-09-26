@@ -31,8 +31,8 @@ The script builds by `-target`/`-sdk iphoneos26.5` rather than with a
 this Mac. The asset catalog (macOS icon) is excluded: `actool` refuses to run
 without an installed simulator runtime.
 
-Install on the test phone (iPhone15,2, iOS 16.4.1) with TrollStore: serve the
-IPA over HTTP and open `apple-magnifier://install?url=<ipa url>`.
+Install on the test phone (iPhone15,2, iOS 16.4.1) by sideloading: serve the
+IPA over HTTP and install it from the phone.
 `devicectl` cannot pair with this phone (CoreDevice error 1010), so there is no
 cable install path.
 
