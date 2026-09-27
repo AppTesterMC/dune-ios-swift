@@ -858,6 +858,7 @@ final class Game: DuneNode {
         // "Fremen Chief" for each hired troop's chief.
         guard world.placeType <= Location.sietchMax else { return [141, 123] }
         var items: [UInt16] = [141]
+        if world.room == 1, let take = takeOrnithopterRow { items.append(take) }
         for person in world.peopleInRoom() {
             if person <= World.harah {
                 items.append(UInt16(109 + person))
@@ -900,6 +901,9 @@ final class Game: DuneNode {
             return battleRows().map { $0.id }
         }
         var items: [UInt16] = [141]
+        // The first room of a place (build_room_command_records, floppy
+        // 327B): TAKE AN ORNITHOPTER, greyed without one parked here.
+        if world.room == 1, let take = takeOrnithopterRow { items.append(take) }
         for person in world.peopleInRoom() where person <= World.harah {
             items.append(UInt16(109 + person))
         }
@@ -908,6 +912,8 @@ final class Game: DuneNode {
         }
         return Array(items.prefix(5))
     }
+
+    private var takeOrnithopterRow: UInt16? { GameText.shared.findCommand("TAKE AN ORNITHOPTER").map { UInt16($0) } }
 
     private var inCommRoom: Bool { world.placeType == Location.palace && world.room == 8 }
 
@@ -918,7 +924,10 @@ final class Game: DuneNode {
             return battleRows().map { $0.greyed }
         }
         let unread = Int(world.b(World.unread)), count = world.sightingCount
-        return items.map { $0 == 202 ? unread == 0 : $0 == 203 ? unread >= count : false }
+        let noOrnithopter = world.location(world.currentLocation).ornithopters == 0 && world.placeType != Location.palace
+        return items.map {
+            $0 == 202 ? unread == 0 : $0 == 203 ? unread >= count : ($0 == takeOrnithopterRow ? noOrnithopter : false)
+        }
     }
 
     // MARK: - Battles
@@ -1944,6 +1953,8 @@ final class Game: DuneNode {
             return
         }
         switch mainMenuItems[index] {
+        case let row where row == takeOrnithopterRow:
+            openMap(select: true, caption: false) // choose where to fly
         case 202:
             openCommList(seen: false)
         case 203:
@@ -2020,6 +2031,10 @@ final class Game: DuneNode {
             let rootItems = sietchRootCharacterItems()
             guard index < rootItems.count else { return }
             switch rootItems[index] {
+            case let row where row == takeOrnithopterRow:
+                if world.location(world.currentLocation).ornithopters > 0 {
+                    openMap(select: true, caption: false)
+                }
             case 141:
                 openMap(select: false, caption: true)
             case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132:
