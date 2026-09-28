@@ -545,8 +545,10 @@ final class Game: DuneNode {
         var items: [UInt16] = []
         if let skip = GameText.shared.findCommand("SKIP TO DESTINATION") { items.append(UInt16(skip)) }
         if let change = GameText.shared.findCommand("CHANGE DESTINATION") { items.append(UInt16(change)) }
+        // In flight the left panel is the book with the day and the
+        // companions (the original's flight captures).
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
-            leftPanel: .map, rightPanel: .rect, items: items, directions: [],
+            leftPanel: .bookClosed, rightPanel: .rect, items: items, directions: [],
             day: gameState.day, phase: gameState.phase))
     }
 
