@@ -114,8 +114,19 @@ def capture_times(capture: Path) -> dict[str, float]:
     return times
 
 
+def capture_clicks(capture: Path) -> list[tuple[float, int, int]]:
+    """The clicks of the original's run (its autoplay.log), in order."""
+    log = capture / "autoplay.log"
+    if not log.exists():
+        return []
+    return [(int(m.group(1)) / 1000, int(m.group(2)), int(m.group(3)))
+            for m in re.finditer(r"\[\s*(\d+) ms\] click \w+ (\d+) (\d+)", log.read_text())]
+
+
 def matches(script: Path, capture: Path) -> bool:
-    """The script is the one the capture was made with: same checkpoints, same gaps."""
+    """The script is the one the capture was made with: same checkpoints and
+    clicks (a commented-out click takes no time, so times alone can't tell),
+    same gaps."""
     if not script.exists():
         return False
     cap = capture_times(capture)
@@ -125,14 +136,32 @@ def matches(script: Path, capture: Path) -> bool:
     if not common or len(common) < len(names):
         return False
     offset = cap[common[0]] - ours[common[0]]
-    return all(abs(cap[n] - ours[n] - offset) <= 0.3 for n in common)
+    if not all(abs(cap[n] - ours[n] - offset) <= 0.3 for n in common):
+        return False
+    clicks = [(float(x.split(":")[0]) - 0.1, *map(int, x.split(":")[2].split(","))) for x in steps.split(";")
+              if ":click:" in x]
+    theirs = capture_clicks(capture)
+    if theirs:
+        first = min(cap.values())
+        theirs = [c for c in theirs if c[0] >= first - 0.01]
+        clicks = [c for c in clicks if c[0] + offset >= first - 0.01]
+        if len(theirs) != len(clicks) or any((a[1], a[2]) != (b[1], b[2]) or abs(a[0] - b[0] - offset) > 0.3
+                                             for a, b in zip(theirs, clicks)):
+            return False
+    return True
 
 
 def script_for(sc: dict, capture: Path) -> tuple[Path, str]:
     """The script to replay: the one matching the capture (the scenario's own,
     the copy kept with the capture, or the autoplay one it was made with)."""
     own = Path(sc["script"])
-    for cand in (own, capture / "input.script", REFERENCE / "autoplay/scripts" / own.name, REFERENCE / "autoplay" / own.name):
+    # The scripts the capture's log names ("(speedrun.script:93)").
+    log = capture / "autoplay.log"
+    named = sorted(set(re.findall(r"\(([\w.-]+\.script):\d+\)", log.read_text()))) if log.exists() else []
+    logged = [d / n for n in named for d in (REFERENCE / "autoplay", REFERENCE / "autoplay/scripts",
+                                              REFERENCE / "autoplay/scripts/cd", FIDELITY)]
+    for cand in (own, capture / "input.script", *logged, REFERENCE / "autoplay/scripts" / own.name,
+                 REFERENCE / "autoplay" / own.name):
         if matches(cand, capture):
             return cand, "" if cand == own else f"replays {cand.parent.name}/{cand.name}, the script the capture was made with"
     return own, "the script and the original's capture are out of sync"

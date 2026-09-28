@@ -161,7 +161,7 @@ final class Game: DuneNode {
             "salRoom": salIndex,
             "gameRoomID": currentGameRoom,
             "sheet": world.sheet(for: record),
-            "people": world.peopleInRoom(),
+            "people": world.peopleInRoom(companions: false), // companions are not drawn
             "salFile": World.salFile(world.placeType),
             "outdoor": world.isOutdoors(record, placeType: world.placeType),
             // CD: outdoor rooms (not the palace balcony, SAL 10) are the

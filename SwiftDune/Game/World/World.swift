@@ -612,11 +612,14 @@ final class World {
     }
 
     /// Who is in the current room, in ascending character order.
-    func peopleInRoom() -> [Int] {
+    /// The room's people: those standing in it (the Fremen troops too),
+    /// then those travelling with Paul (ds:10), who are listed but not
+    /// drawn (the original: "SEE DUNE MAP / Fremen / Gurney HALLECK").
+    func peopleInRoom(companions: Bool = true) -> [Int] {
         let with = w(World.personsWith)
         var people: [Int] = []
         for c in 0..<World.characterCount where c != World.fremen && c != World.fremenChief {
-            if characterInRoom(c) || (with >> c) & 1 == 1 {
+            if characterInRoom(c) && (with >> c) & 1 == 0 {
                 people.append(c)
             }
         }
@@ -634,6 +637,12 @@ final class World {
         // The smuggler stands in every room of a type-0x21 village.
         if placeType == Location.villageMin && !people.contains(World.smuggler) {
             people.append(World.smuggler)
+        }
+        if companions {
+            for c in 0..<World.characterCount where c != World.fremen && c != World.fremenChief
+                && (with >> c) & 1 == 1 && !people.contains(c) {
+                people.append(c)
+            }
         }
         return people
     }
