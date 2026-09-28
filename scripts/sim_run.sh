@@ -51,6 +51,8 @@ timeout 120 xcrun simctl install $sim "$app"
 
 data=$(xcrun simctl get_app_container $sim $bundle data)
 rm -rf "$data/Documents/shots" "$data/Documents/dune-ios.log"
+# DUNE_SAVE_IN=<file.SAV>: put a save into Documents (DUNE_LOAD picks the slot).
+if [[ -n ${DUNE_SAVE_IN:-} ]]; then mkdir -p "$data/Documents"; cp "$DUNE_SAVE_IN" "$data/Documents/"; fi
 
 env_args=()
 # Test runs are silent (DUNE_MUTE=1; pass DUNE_MUTE=0 to hear them).
