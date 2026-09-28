@@ -62,6 +62,11 @@ final class Palace: DuneNode {
     private var cast: [Int]?
     private var character: DuneCharacter = .none
     private var zoomRect: DuneRect?
+    /// The person speaking (a talk): the view zooms onto their marker.
+    private var speaker: Int?
+    /// Marker index -> person number, from applyPeople.
+    private var personAt: [Int: Int] = [:]
+    private lazy var zoomScratch = PixelBuffer(width: 320, height: 152)
     private var dayMode: DuneLightMode = .day
     
     private var transitionIn: TransitionEffect = .none
@@ -100,12 +105,29 @@ final class Palace: DuneNode {
                 if slot < cast.count && cast[slot] != 0xFF { assignment[j] = cast[slot] }
             }
         }
+        personAt = assignment
         markers = assignment.compactMapValues { RoomCharacter(rawValue: World.persFrame($0)) }
         scenery.characters = markers
         engine.logger.log(.debug, "applyPeople sal \(sal) markers \(scenery.rooms[sal].markerCount) people \(people) -> \(assignment)")
     }
     
     
+    /// While a line is spoken the view is the room zoomed four times from
+    /// the speaker's marker: its top-left is the marker's point (measured on
+    /// the original floppy: Leto's marker 186,53 and Jessica's 191,57 give
+    /// the best 4x match, 10.7 and 21 against 51+ for other factors).
+    private var speakerZoom: DuneRect? {
+        guard characterSprite != nil, let who = speaker, let scenery = palaceScenery, let sal = salRoomIndex,
+              sal >= 0 && sal < scenery.rooms.count else { return nil }
+        var p = DunePoint(160, 60)
+        if let j = personAt.first(where: { $0.value == who })?.key,
+           let marker = scenery.rooms[sal].commands.compactMap({ $0 as? RoomMarker }).first(where: { $0.index == j }) {
+            p = marker.pt
+        }
+        let x0 = min(max(Int(p.x), 0), 240), y0 = min(max(Int(p.y), 0), 114)
+        return DuneRect(Int16(x0), Int16(y0), 80, 38)
+    }
+
     /// Parked ornithopters (ScummVM scene.cpp 1174-1242): up to three on
     /// the pad, each further one 70 px right and 10 px lower; ORNYTK body 0,
     /// hub 1 at +(6,30), legs 2 at +(4,50), wings 8 at +(-81,-3) (frame 0).
@@ -236,6 +258,9 @@ final class Palace: DuneNode {
             characterSprite = nil
         }
         
+        if params.keys.contains("speaker") || params["gameRoomID"] != nil {
+            speaker = params["speaker"] as? Int
+        }
         if let zoom = params["zoom"] {
             self.zoomRect = zoom as? DuneRect
         }
@@ -285,8 +310,9 @@ final class Palace: DuneNode {
             sky.lightMode = .day
         }
 
+        let talkZoom = zoomRect == nil ? speakerZoom : nil
         var fx: SpriteEffect {
-            if let zoomRect = zoomRect {
+            if let zoomRect = zoomRect ?? talkZoom {
                 return .zoom(start: 0, duration: 9999.0, current: currentTime, from: zoomRect, to: zoomRect)
             } else {
                 return .none
@@ -354,7 +380,19 @@ final class Palace: DuneNode {
         } else {
             // Interior rooms have no exterior sky. PALACE.SAL already contains
             // the complete polygon/sprite command stream for these rooms.
-            palaceScenery.drawRoom(roomIndex, buffer: intermediateFrameBuffer)
+            if talkZoom != nil {
+                // The speaker is not drawn in the room behind their portrait.
+                let all = palaceScenery.characters
+                if let who = speaker, let j = personAt.first(where: { $0.value == who })?.key {
+                    palaceScenery.characters[j] = nil
+                }
+                zoomScratch.clearBuffer()
+                palaceScenery.drawRoom(roomIndex, buffer: zoomScratch)
+                palaceScenery.characters = all
+                zoomScratch.render(to: intermediateFrameBuffer, effect: fx)
+            } else {
+                palaceScenery.drawRoom(roomIndex, buffer: intermediateFrameBuffer)
+            }
         }
 
         // Rust's room renderer builds a fresh palette for every frame. Keep
@@ -389,6 +427,12 @@ final class Palace: DuneNode {
             sky.setPalette(gameplayPalette: true)
         }
         
+        // The floppy's ornithopter: ORNYTK's own palette chunk (80-96, the
+        // brown body and green canopy) over the room's (ScummVM drawOrni).
+        if parked.count > 0 && World.shared.isFloppy && (isGameplayExterior || gameRoomID != nil) {
+            ornithopter.setPalette()
+        }
+
         if let characterSprite = characterSprite {
             characterSprite.setPalette()
             characterSprite.drawAnimation(0, buffer: intermediateFrameBuffer, time: currentTime)

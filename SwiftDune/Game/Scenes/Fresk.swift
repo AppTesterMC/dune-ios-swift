@@ -40,6 +40,11 @@ final class Fresk: DuneNode {
     private var font: GameFont?
     private var commands: Sentence?
     private var menuMode: FreskMenuMode = .globe
+    /// LOOK AT MIRROR (seg000:0ea6): MIRROR.HSQ and Paul's face instead of
+    /// the globe; the menu RESTART / LOAD / SAVE / EXIT GAME / Look away.
+    private(set) var mirror = false
+    private var mirrorSprite: Sprite?
+    private var paulSprite: Sprite?
     
     private var panelState: FreskPanelState = .closed {
         didSet {
@@ -69,11 +74,26 @@ final class Fresk: DuneNode {
         font = GameFont()
         commands = Sentence(.command, language: .english)
         menuMode = .globe
+        mirror = false
+    }
+
+    /// Params: "mirror": true shows the mirror.
+    override func onParamsChange() {
+        mirror = params["mirror"] as? Bool ?? false
+        if mirror {
+            mirrorSprite = mirrorSprite ?? Sprite("MIRROR.HSQ")
+            paulSprite = paulSprite ?? Sprite("PAUL.HSQ")
+        }
+        menuMode = .globe
+        statusCaption = nil
+        publishMenuState()
     }
     
     
     override func onDisable() {
         freskSprite = nil
+        mirrorSprite = nil
+        paulSprite = nil
         globe = nil
         font = nil
         commands = nil
@@ -156,7 +176,7 @@ final class Fresk: DuneNode {
             rowCaptions = menuMode == .save || menuMode == .load ? slotCaptions : nil
         }
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
-            leftPanel: .globe,
+            leftPanel: mirror ? .bookClosed : .globe,
             rightPanel: .rect,
             items: menuItems,
             day: GameState.shared.day,
@@ -178,6 +198,11 @@ final class Fresk: DuneNode {
             return
         }
         
+        if mirror {
+            renderMirror(buffer)
+            return
+        }
+
         freskSprite.setPalette()
 
         if menuMode == .results {
@@ -194,8 +219,33 @@ final class Fresk: DuneNode {
     }
 
 
+    /// callback_transition_look_at_mirror (seg000:0ed0): the reflected
+    /// bedroom (MIRROR 0 and 1), Paul's face (PAUL, by the clock: he ages,
+    /// seg000:917a), then the gilt frame (MIRROR 2).
+    private func renderMirror(_ buffer: PixelBuffer) {
+        guard let mirrorSprite = mirrorSprite else { return }
+        Primitives.fillRect(DuneRect(0, 0, 320, 152), 0, buffer, isOffset: false)
+        mirrorSprite.setPalette()
+        mirrorSprite.drawFrame(0, x: 0, y: 0, buffer: buffer)
+        mirrorSprite.drawFrame(1, x: 0, y: 0, buffer: buffer)
+        if let paul = paulSprite {
+            paul.setPalette()
+            let expression = UInt16(min(Int(World.shared.w(World.gameTime) >> 6), 8) * 2)
+            paul.drawAnimation(expression, buffer: buffer, time: 0, offset: .zero, loop: false)
+        }
+        mirrorSprite.setPalette()
+        mirrorSprite.drawFrame(2, x: 0, y: 0, buffer: buffer)
+    }
+
+    private var mirrorItems: [UInt16] {
+        [Fresk.row("RESTART GAME", 173), Fresk.row("LOAD GAME", 167), Fresk.row("SAVE GAME", 166),
+         Fresk.row("EXIT GAME", 174), Fresk.row("Look away from the mirror", 170)]
+    }
+
     private var menuItems: [UInt16] {
         switch menuMode {
+        case .globe where mirror:
+            return mirrorItems
         case .globe:
             return menuItemsGlobe
         case .results:
@@ -307,6 +357,15 @@ final class Fresk: DuneNode {
             return .handled
         }
         switch menuMode {
+        case .globe where mirror:
+            switch index {
+            case 0: return .restart
+            case 1: return show(.load)
+            case 2: return show(.save)
+            case 3: return show(.quitConfirmation)
+            case 4: return .close // Look away from the mirror
+            default: return .handled
+            }
         case .globe, .results:
             switch index {
             case 0: return .exitGlobe

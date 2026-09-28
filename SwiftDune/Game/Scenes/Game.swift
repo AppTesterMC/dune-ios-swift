@@ -173,6 +173,7 @@ final class Game: DuneNode {
         var params = roomParams
         if let dialogueCharacter = dialogueCharacter {
             params["character"] = dialogueCharacter
+            params["speaker"] = characterNumber(dialogueCharacter) as Any
         }
 
         if let palaceNode = findNode("Palace") {
@@ -191,9 +192,7 @@ final class Game: DuneNode {
 
     /// Room 1 shows the place's ornithopters, the palace always at least one.
     private func parkedOrnithopters() -> Int {
-        // CD only for now: the floppy's ORNYTK colours are not recovered
-        // (it has no palette of its own).
-        guard world.room == 1, !world.isFloppy else { return 0 }
+        guard world.room == 1 else { return 0 }
         let count = Int(world.location(world.currentLocation).ornithopters)
         return world.placeType == Location.palace ? max(1, count) : count
     }
@@ -412,7 +411,7 @@ final class Game: DuneNode {
         if takeOff != nil { return true } // the take-off is over: fly
         let airborne = changingDestination
         changingDestination = false
-        guard !world.isFloppy, !riding, !inDesert, !airborne else { return true }
+        guard !riding, !inDesert, !airborne else { return true }
         if world.room != 1 { world.setRoom(1) }
         guard parkedOrnithopters() > 0 else { return true }
         mapActive = false
@@ -750,7 +749,7 @@ final class Game: DuneNode {
     private func sceneLine(_ who: Int) {
         dialogueCharacter = duneCharacter(number: who)
         if let palace = findNode("Palace"), let character = dialogueCharacter {
-            palace.params = ["character": character]
+            palace.params = ["character": character, "speaker": who]
         }
         conversation = Conversation(story: story, character: min(who, World.fremenChief), list: 7, mask: 0x80,
                                     oneList: true, single: true)
@@ -1000,16 +999,21 @@ final class Game: DuneNode {
         // The first room of a place (build_room_command_records, floppy
         // 327B): TAKE AN ORNITHOPTER, greyed without one parked here.
         if world.room == 1, let take = takeOrnithopterRow { items.append(take) }
+        // The room's verbs before its people (build_room_command_records):
+        // the COMM room's messages, Paul's room's mirror.
+        if inCommRoom && world.sightingCount > 0 {
+            items += [202, 203]
+        } else if world.placeType == Location.palace && world.room == 9, let mirror = lookAtMirrorRow {
+            items.append(mirror)
+        }
         for person in world.peopleInRoom() where person <= World.harah {
             items.append(UInt16(109 + person))
-        }
-        if inCommRoom && world.sightingCount > 0 {
-            items = Array(items.prefix(3)) + [202, 203]
         }
         return Array(items.prefix(5))
     }
 
     private var takeOrnithopterRow: UInt16? { GameText.shared.findCommand("TAKE AN ORNITHOPTER").map { UInt16($0) } }
+    private var lookAtMirrorRow: UInt16? { GameText.shared.findCommand("LOOK AT MIRROR").map { UInt16($0) } }
 
     private var inCommRoom: Bool { world.placeType == Location.palace && world.room == 8 }
 
@@ -1487,6 +1491,8 @@ final class Game: DuneNode {
         conversation = nil
         dialogueCharacter = nil
         dialoguePhraseOverride = nil
+        // The room without the portrait or the zoom.
+        showRoomOrSietch()
         if sietchActive {
             publishSietchUI(items: sietchRootCharacterItems())
         } else {
@@ -1707,6 +1713,13 @@ final class Game: DuneNode {
     }
     
     
+    /// LOOK AT MIRROR: the mirror and its game menu (the Fresk node's mirror mode).
+    func showMirror() {
+        showFresk()
+        findNode("Fresk")?.params = ["mirror": true]
+        engine.logger.log(.info, "Mirror: Paul looks at himself")
+    }
+
     func showFresk() {
         if findNode("Fresk") == nil {
           attachNode(Fresk())
@@ -2113,6 +2126,8 @@ final class Game: DuneNode {
         switch mainMenuItems[index] {
         case let row where row == takeOrnithopterRow:
             openCockpit() // choose where to fly
+        case let row where row == lookAtMirrorRow:
+            showMirror()
         case 202:
             openCommList(seen: false)
         case 203:

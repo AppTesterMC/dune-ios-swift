@@ -59,7 +59,7 @@ final class UI: DuneNode {
     
     private let menuRect = DuneRect(92, 159, 136, 40)
     private var menuItemBackgroundRect = DuneRect(93, 159, 134, 7)
-    private var menuItemTextRect = DuneRect(97, 159, 120, 8)
+    private var menuItemTextRect = DuneRect(97, 159, 131, 8) // to the box edge, as the original
   
     private let dayTextRect = DuneRect(7, 189, 22, 10)
     
