@@ -186,6 +186,32 @@ final class GameFont {
     }
     
     
+    /// One line as the original draws it: every character in turn, runs of
+    /// spaces and leading spaces kept (text that centres itself with
+    /// spaces, like the DUNE MAP box), the pen's top-left at (x, y).
+    func renderLine(_ text: String, x: Int, y: Int, buffer: PixelBuffer, style: FontSize = .normal) {
+        var pen = x
+        var word = ""
+        func flush() {
+            guard !word.isEmpty else { return }
+            let w = width(for: word, style: style)
+            drawText([SizedText(text: word, size: w)], x: UInt16(max(0, pen)), y: UInt16(max(0, y)),
+                     width: UInt16(w), buffer: buffer, style: style, alignment: .left)
+            pen += w
+            word = ""
+        }
+        let space = style == .small ? min(6, spaceWidth) : spaceWidth
+        for c in text {
+            if c == " " {
+                flush()
+                pen += space
+            } else {
+                word.append(c)
+            }
+        }
+        flush()
+    }
+
     private func drawText(_ words: [SizedText], x: UInt16, y: UInt16, width: UInt16, buffer: PixelBuffer, style: FontSize = .normal, alignment: FontAlignment = .left) {
         var currentX = Int(x)
         let currentY = Int(y)

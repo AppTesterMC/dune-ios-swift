@@ -68,6 +68,15 @@ final class GameText {
 
     /// Text of a COMMAND entry (0-based index), printable characters only.
     /// COMMAND text by floppy id (translated on the CD).
+    /// A command's text split at its carriage returns (command() drops them).
+    func commandLines(_ floppyId: Int) -> [String] {
+        let index = commandIndex(floppyId)
+        let bytes = commands.rawBytes(at: UInt16(index))
+        return bytes.split(separator: 0x0D, omittingEmptySubsequences: false).map {
+            String(bytes: $0.filter { $0 >= 0x20 && $0 < 0x80 }, encoding: .isoLatin1) ?? ""
+        }
+    }
+
     func command(_ floppyId: Int) -> String {
         let index = commandIndex(floppyId)
         return String(bytes: commands.rawBytes(at: UInt16(index)).filter { $0 >= 0x20 && $0 < 0x80 }, encoding: .isoLatin1) ?? ""

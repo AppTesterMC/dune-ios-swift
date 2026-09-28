@@ -64,6 +64,8 @@ final class Palace: DuneNode {
     private var zoomRect: DuneRect?
     /// The person speaking (a talk): the view zooms onto their marker.
     private var speaker: Int?
+    /// The portrait's animation (a Fremen's expression by troop; 0 else).
+    private var expression: UInt16 = 0
     /// Marker index -> person number, from applyPeople.
     private var personAt: [Int: Int] = [:]
     private lazy var zoomScratch = PixelBuffer(width: 320, height: 152)
@@ -260,6 +262,7 @@ final class Palace: DuneNode {
         
         if params.keys.contains("speaker") || params["gameRoomID"] != nil {
             speaker = params["speaker"] as? Int
+            expression = UInt16(params["expression"] as? Int ?? 0)
         }
         if let zoom = params["zoom"] {
             self.zoomRect = zoom as? DuneRect
@@ -435,7 +438,11 @@ final class Palace: DuneNode {
 
         if let characterSprite = characterSprite {
             characterSprite.setPalette()
-            characterSprite.drawAnimation(0, buffer: intermediateFrameBuffer, time: currentTime)
+            if expression != 0 {
+                characterSprite.drawAnimation(expression, buffer: intermediateFrameBuffer, time: 0, loop: false)
+            } else {
+                characterSprite.drawAnimation(0, buffer: intermediateFrameBuffer, time: currentTime)
+            }
         }
         
         var fxTransition: SpriteEffect {

@@ -241,12 +241,26 @@ final class FlatMap: DuneNode {
         Primitives.drawLine(DunePoint(10, 63), DunePoint(189, 63), 0xF5, buffer, isOffset: false)
         Primitives.drawLine(DunePoint(10, 10), DunePoint(10, 63), 0xF5, buffer, isOffset: false)
         Primitives.drawLine(DunePoint(189, 10), DunePoint(189, 63), 0xF5, buffer, isOffset: false)
-        var text = GameText.shared.command(213)
-        if let range = text.range(of: "[0-9]+", options: .regularExpression) {
-            text.replaceSubrange(range, with: "\(min(999, Int(world.b(0x28))))")
+        // The phrase's own lines (it centres itself with spaces), the pen at
+        // the box's corner + (10, 8), one line per 10 rows; the rallied
+        // troops (ds:28) over its first number as a 3-character field ending
+        // where that number ends (seg000:5bb0, d03c).
+        let id = GameText.shared.findCommand("DUNE  MAP") ?? 213
+        var lines = GameText.shared.commandLines(id)
+        for (k, line) in lines.enumerated() {
+            guard let range = line.range(of: "[0-9]+", options: .regularExpression) else { continue }
+            let end = line.distance(from: line.startIndex, to: range.upperBound)
+            guard end >= 3 else { break }
+            var chars = Array(line)
+            let field = Array(String(format: "%3d", min(999, Int(world.b(0x28)))))
+            for i in 0..<3 { chars[end - 3 + i] = field[i] }
+            lines[k] = String(chars)
+            break
         }
         font.paletteIndex = 243
-        font.render(text, rect: DuneRect(20, 16, 164, 44), buffer: buffer, alignment: .left, style: .small)
+        for (i, line) in lines.prefix(4).enumerated() {
+            font.renderLine(line, x: 20, y: 18 + 10 * i, buffer: buffer)
+        }
     }
 
 

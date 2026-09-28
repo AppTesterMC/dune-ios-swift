@@ -60,7 +60,9 @@ final class MapRenderer {
     /// 0x10-0x1F of ONMAP's palette).
     func draw(_ view: PixelBuffer, latitude: Int, longitude: UInt16) {
         let cells = map()
-        let top = latitude + 75 + 5
+        // A latitude is map row latitude + 98 (map_func, seg000:b58b: the
+        // TABLAT row is |latitude|; +80 drew the terrain 18 rows off).
+        let top = latitude + 98
         for i in 0..<MapRenderer.viewRows {
             drawBand(view, cells, band: i, row: top + i, longitude: longitude)
         }
@@ -204,8 +206,10 @@ final class MapRenderer {
 
     /// Screen position of a place on the flat map, nil when out of view.
     func project(latitude: Int, longitude: UInt16, placeLatitude: Int, placeLongitude: UInt16) -> DunePoint? {
-        let top = latitude + 75 + 5
-        let row = placeLatitude + 75 + 5
+        // A latitude is map row latitude + 98 (map_func, seg000:b58b: the
+        // TABLAT row is |latitude|; +80 drew the terrain 18 rows off).
+        let top = latitude + 98
+        let row = placeLatitude + 98
         let band = row - top
         guard band >= 0 && band < MapRenderer.viewRows,
               row >= MapRenderer.bandBegin && row < MapRenderer.bandEnd else { return nil }
@@ -236,7 +240,7 @@ final class MapRenderer {
         let band = (y - MapRenderer.viewY - 2) / 4
         guard band >= 0 && band < MapRenderer.viewRows else { return nil }
         let placeLatitude = latitude + band
-        let row = placeLatitude + 75 + 5
+        let row = placeLatitude + 98
         guard row >= MapRenderer.bandBegin && row < MapRenderer.bandEnd else { return nil }
         let len = rowLength(row)
         guard len > 0 else { return nil }

@@ -173,7 +173,8 @@ final class Game: DuneNode {
         var params = roomParams
         if let dialogueCharacter = dialogueCharacter {
             params["character"] = dialogueCharacter
-            params["speaker"] = characterNumber(dialogueCharacter) as Any
+            params["speaker"] = (talkPerson ?? characterNumber(dialogueCharacter)) as Any
+            params["expression"] = talkExpression(talkPerson)
         }
 
         if let palaceNode = findNode("Palace") {
@@ -306,8 +307,10 @@ final class Game: DuneNode {
         }
         add(.density, map.density ? "STANDARD VISION" : "SEE SPICE DENSITY", phase < 5)
         if !map.selecting {
+            // Greyed away from the pad (the original, from the throne room:
+            // explore-07), or without an ornithopter there.
             let parked = world.location(world.currentLocation).ornithopters > 0 || world.placeType == Location.palace
-            add(.takeOrnithopter, "TAKE AN ORNITHOPTER", !parked)
+            add(.takeOrnithopter, "TAKE AN ORNITHOPTER", !parked || world.room != 1)
         }
         if phase >= 5 { add(.prospectors, "FIND PROSPECTORS") }
         return Array(rows.prefix(5))
@@ -1030,6 +1033,17 @@ final class Game: DuneNode {
     }
 
 
+    /// The person a room row stands for: 109-117 the named ones, 123 the
+    /// Fremen, 124... their chiefs.
+    private func person(forCommandItem item: UInt16) -> Int? {
+        switch item {
+        case 109...117: return Int(item) - 109
+        case 123: return World.fremen
+        case 124...132: return World.fremenChief + Int(item) - 124
+        default: return nil
+        }
+    }
+
     private func character(forCommandItem item: UInt16) -> DuneCharacter? {
         switch item {
         case 109: return .leto
@@ -1463,9 +1477,18 @@ final class Game: DuneNode {
         case 10: return .feyd
         case 11: return .emperor
         case World.captain: return .captain
-        case World.fremen...: return .fremen1
+        case World.fremen...:
+            // Their troop's head (seg000:913b).
+            let troop = world.troopForPerson(number) ?? 0
+            return [.fremen1, .fremen2, .fremen3][World.fremenHead(troop)]
         default: return nil
         }
+    }
+
+    /// The portrait's idle expression: a Fremen's by their troop, 0 else.
+    private func talkExpression(_ number: Int?) -> Int {
+        guard let n = number, n >= World.fremen, let troop = world.troopForPerson(n) else { return 0 }
+        return World.fremenExpression(troop)
     }
 
 
@@ -1554,8 +1577,12 @@ final class Game: DuneNode {
     }
 
 
+    /// The person number of the room talk under way (for the portrait).
+    private var talkPerson: Int?
+
     /// STOP TALKING, or a click after the last line: the room's rows again.
     private func endTalk() {
+        talkPerson = nil
         setNodeActive("Dialogue", false)
         conversation = nil
         dialogueCharacter = nil
@@ -2214,7 +2241,8 @@ final class Game: DuneNode {
             // marker 8. Selecting his command returns to that room with the
             // correct person slot populated.
             guard let speaker = character(forCommandItem: mainMenuItems[index]) else { return }
-            beginTalk(with: speaker, context: .palace)
+            talkPerson = person(forCommandItem: mainMenuItems[index])
+            beginTalk(with: talkPerson.flatMap { duneCharacter(number: $0) } ?? speaker, context: .palace)
         case 214:
             showBook()
         default:
@@ -2286,7 +2314,8 @@ final class Game: DuneNode {
                 openMap(select: false, caption: true)
             case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132:
                 guard let speaker = character(forCommandItem: rootItems[index]) else { return }
-                beginTalk(with: speaker, context: .sietch)
+                talkPerson = person(forCommandItem: rootItems[index])
+                beginTalk(with: talkPerson.flatMap { duneCharacter(number: $0) } ?? speaker, context: .sietch)
             default:
                 break
             }

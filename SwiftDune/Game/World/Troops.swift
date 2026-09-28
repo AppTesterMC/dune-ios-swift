@@ -76,6 +76,29 @@ extension World {
         troopsAt(currentLocation).first { !$0.harkonnen && $0.hired == hired }?.id
     }
 
+    /// The troop a Fremen person stands for here: "Fremen" the first troop
+    /// not hired yet, the chiefs the hired ones in order (ScummVM
+    /// World::troopForPerson).
+    func troopForPerson(_ group: Int) -> Int? {
+        if group < World.fremen { return nil }
+        if group == World.fremen { return localTroop(hired: false) }
+        let hired = troopsAt(currentLocation).filter { !$0.harkonnen && $0.hired }
+        let k = group - World.fremenChief
+        return k >= 0 && k < hired.count ? hired[k].id : nil
+    }
+
+    /// A Fremen's head: FRM1-3 by the troop id mod 3 (seg000:913b).
+    static func fremenHead(_ troop: Int) -> Int { troop % 3 }
+
+    /// The head's expression: the rest of id / 3 folded below 15 (17 when
+    /// the head is not FRM1).
+    static func fremenExpression(_ troop: Int) -> Int {
+        var q = troop / 3
+        let limit = troop % 3 != 0 ? 17 : 15
+        while q >= limit { q -= limit }
+        return q
+    }
+
     /// seg000:6efd.
     func motivationModifier(_ id: Int) -> Int {
         let job = troopByte(id, 3) & 0x0F
