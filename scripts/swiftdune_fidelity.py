@@ -24,6 +24,7 @@ import html
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -178,9 +179,14 @@ def main() -> int:
     ap.add_argument("--out", default=str(Path.home() / "dune-serve/cryo-dune-20260922/fidelity-swiftdune"))
     ap.add_argument("--offset", type=float, default=2.0, help="seconds from game start to the script's time 0")
     args = ap.parse_args()
-    out = Path(args.out)
+    # The report is built in a staging folder and swapped in at the end, so
+    # the published page never points at missing images during a run.
+    published = Path(args.out)
+    out = published.with_name(published.name + ".new")
+    if out.exists():
+        shutil.rmtree(out)
     img = out / "img"
-    img.mkdir(parents=True, exist_ok=True)
+    img.mkdir(parents=True)
     manifest = json.loads((FIDELITY / "scenarios.json").read_text())
     # The floppy scenarios only: the manifest's CD ones ("data": "cd") are the
     # ScummVM harness's; SwiftDune's CD build is scored by CD_SCENARIOS below.
@@ -226,15 +232,25 @@ def main() -> int:
     cd = [r for r in results if r["cd"]]
     overall = sum(r["score"] for r in floppy) / len(floppy) if floppy else 0.0
     overall_cd = sum(r["score"] for r in cd) / len(cd) if cd else 0.0
-    history_path = out / "history.json"
+    history_path = published / "history.json"
     history = json.loads(history_path.read_text()) if history_path.exists() else []
     if not args.only:
         history.append({"date": datetime.datetime.now().isoformat(timespec="minutes"), "commit": commit,
                         "overall": round(overall, 2), "overall_cd": round(overall_cd, 2), "scenarios": {r["name"]: round(r["score"], 2) for r in results}})
-        history_path.write_text(json.dumps(history, indent=1))
+        (out / "history.json").write_text(json.dumps(history, indent=1))
     (out / "results.json").write_text(json.dumps(results, indent=1))
     write_html(out, results, overall, overall_cd, history, commit)
-    print(f"floppy {overall:.1f}%  CD {overall_cd:.1f}%  report: {out / 'index.html'}")
+    if history_path.exists() and not (out / "history.json").exists():
+        shutil.copy(history_path, out / "history.json")
+    old = published.with_name(published.name + ".old")
+    if old.exists():
+        shutil.rmtree(old)
+    if published.exists():
+        published.rename(old)
+    out.rename(published)
+    if old.exists():
+        shutil.rmtree(old)
+    print(f"floppy {overall:.1f}%  CD {overall_cd:.1f}%  report: {published / 'index.html'}")
     return 0
 
 
