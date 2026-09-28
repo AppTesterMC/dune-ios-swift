@@ -18,6 +18,8 @@ enum FreskMenuAction {
     case quit
     /// A save was loaded: show wherever it puts Paul.
     case loaded
+    /// EXIT GLOBE: the flat map (the original's CS:bb80 handler).
+    case exitGlobe
     case restart
 }
 
@@ -114,10 +116,19 @@ final class Fresk: DuneNode {
     /// DUNE21S<k+1>.SAV, as in the original (S0 is not one of the logs).
     private static func file(_ row: Int) -> Int { row + 1 }
 
+    /// Rows looked up by text (the ids differ between releases).
+    private static func row(_ text: String, _ fallback: UInt16) -> UInt16 {
+        GameText.shared.findCommand(text).map { UInt16($0) } ?? fallback
+    }
+    private static var cancelRow: UInt16 { row("Cancel", 170) }
+    /// The original's lists (floppy DS:26e4/26f4): two logs to save to,
+    /// four entries to load from, then Cancel.
+    private var slotCount: Int { menuMode == .save ? 2 : 4 }
+
     private var slotCaptions: [String] {
         let labels = GameText.shared.command(266)
         var captions: [String] = []
-        for slot in 0..<4 {
+        for slot in 0..<slotCount {
             var caption = GameText.shared.command(258 + slot)
             if slot < 2, let time = SaveGame.shared.slotTime(Fresk.file(slot)) {
                 let period = Int(time & 15)
@@ -129,7 +140,8 @@ final class Fresk: DuneNode {
             }
             captions.append(caption)
         }
-        captions.append(statusCaption ?? GameText.shared.command(170))
+        captions.append(GameText.shared.command(Int(Fresk.cancelRow)))
+        if let status = statusCaption { captions.append(status) }
         return captions
     }
     private var statusCaption: String?
@@ -190,11 +202,16 @@ final class Fresk: DuneNode {
             return menuItemsStats
         case .quitConfirmation:
             return [171, 172]
-        case .save, .load:
-            return [258, 259, 260, 261, 170]
+        case .save:
+            // SAVE SUCCESSFUL / *** SAVE ERROR under Cancel once saved.
+            return [258, 259, Fresk.cancelRow] + (statusCaption != nil ? [Fresk.cancelRow] : [])
+        case .load:
+            return [258, 259, 260, 261, Fresk.cancelRow]
         case .options:
-            // MUSIC OFF / MUSIC ON (GAME RELATIVE), RESTART, EXIT GAME, EXIT GLOBE
-            return [engine.audioPlayer.musicMuted ? 254 : 257, 173, 174, 170]
+            // Floppy DS:26bc: MUSIC OFF, MUSIC ON (GAME RELATIVE), MUSIC ON
+            // (CD-STYLE), EXIT GAME, Cancel.
+            return [Fresk.row("MUSIC OFF", 254), Fresk.row("MUSIC ON (GAME RELATIVE)", 257),
+                    Fresk.row("MUSIC ON (CD-STYLE)", 257), Fresk.row("EXIT GAME", 174), Fresk.cancelRow]
         }
     }
 
@@ -292,7 +309,7 @@ final class Fresk: DuneNode {
         switch menuMode {
         case .globe, .results:
             switch index {
-            case 0: return .close
+            case 0: return .exitGlobe
             case 1: return show(menuMode == .globe ? .results : .globe)
             case 2: return show(.save)
             case 3: return show(.load)
@@ -300,23 +317,26 @@ final class Fresk: DuneNode {
             default: return .handled
             }
         case .save:
-            if index == 4 { return .close }
-            // SAVE SUCCESSFUL (262) or *** SAVE ERROR (263) in the last row.
+            // Cancel: back to the globe menu (kRowMenuBack).
+            if index == 2 { return show(.globe) }
+            guard index < 2 else { return .handled }
+            // SAVE SUCCESSFUL (262) or *** SAVE ERROR (263) under Cancel.
             statusCaption = GameText.shared.command(SaveGame.shared.save(Fresk.file(index)) ? 262 : 263)
             publishMenuState()
             return .handled
         case .load:
-            if index == 4 { return .close }
+            if index == 4 { return show(.globe) }
             return SaveGame.shared.load(Fresk.file(index)) ? .loaded : .handled
         case .options:
             switch index {
-            case 0:
-                engine.audioPlayer.musicMuted.toggle()
+            case 0, 1, 2:
+                // MUSIC OFF, or on (the CD-style order list is not ported:
+                // it plays in the game-relative order).
+                engine.audioPlayer.musicMuted = index == 0
                 publishMenuState()
                 return .handled
-            case 1: return .restart
-            case 2: return show(.quitConfirmation)
-            case 3: return .close
+            case 3: return show(.quitConfirmation)
+            case 4: return show(.globe) // Cancel
             default: return .handled
             }
         case .quitConfirmation:

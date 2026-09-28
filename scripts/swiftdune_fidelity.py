@@ -46,9 +46,9 @@ SHOTS = HERE / "build/shots"
 FIDELITY_SCRIPTS = Path.home() / "Cryogenic-local/tests/fidelity"
 CD_SCENARIOS = [
     {"name": "cd-explore", "title": "CD: the day 1 tour's clicks (explore.script)", "cd": True,
-     "script": FIDELITY_SCRIPTS / "explore.script", "original": "cd-explore"},
+     "script": CAPTURES / "cd-explore/input.script", "original": "cd-explore"},
     {"name": "cd-speedrun-day1", "title": "CD: the day 1 speedrun's clicks (speedrun-day1.script)", "cd": True,
-     "script": FIDELITY_SCRIPTS / "speedrun-day1.script", "original": "cd-speedrun"},
+     "script": CAPTURES / "cd-speedrun/input.script", "original": "cd-speedrun"},
     {"name": "cd-flight", "title": "CD, new game: the palace front, TAKE AN ORNITHOPTER, Carthag-Tuek on the "
      "cockpit map, take-off, flight, arrival", "cd": True, "prelude_in_script": True,
      "script": REFERENCE / "autoplay/scripts/cd/flight.script", "original": "cd-flight"},
@@ -87,6 +87,41 @@ def translate(script: Path, offset: float, skip_prelude: bool = False) -> tuple[
     # would land first: inputs go 0.1 s after the checkpoints.
     steps = [x if ":shot:" in x else f"{float(x.split(':', 1)[0]) + 0.1:.2f}:{x.split(':', 1)[1]}" for x in steps]
     return ";".join(steps), t + 4, names
+
+
+def capture_times(capture: Path) -> dict[str, float]:
+    """The checkpoints' times in the original's run (its autoplay.log)."""
+    times = {}
+    log = capture / "autoplay.log"
+    for line in log.read_text().splitlines() if log.exists() else []:
+        m = re.search(r"\[\s*(\d+) ms\] checkpoint (\S+)", line)
+        if m and m.group(2) not in times:
+            times[m.group(2)] = int(m.group(1)) / 1000
+    return times
+
+
+def matches(script: Path, capture: Path) -> bool:
+    """The script is the one the capture was made with: same checkpoints, same gaps."""
+    if not script.exists():
+        return False
+    cap = capture_times(capture)
+    steps, _, names = translate(script, 0.0)
+    ours = {x.split(":shot:")[1]: float(x.split(":")[0]) for x in steps.split(";") if ":shot:" in x}
+    common = [n for n in names if n in cap]
+    if not common or len(common) < len(names):
+        return False
+    offset = cap[common[0]] - ours[common[0]]
+    return all(abs(cap[n] - ours[n] - offset) <= 0.3 for n in common)
+
+
+def script_for(sc: dict, capture: Path) -> tuple[Path, str]:
+    """The script to replay: the one matching the capture (the scenario's own,
+    the copy kept with the capture, or the autoplay one it was made with)."""
+    own = Path(sc["script"])
+    for cand in (own, capture / "input.script", REFERENCE / "autoplay/scripts" / own.name, REFERENCE / "autoplay" / own.name):
+        if matches(cand, capture):
+            return cand, "" if cand == own else f"replays {cand.parent.name}/{cand.name}, the script the capture was made with"
+    return own, "the script and the original's capture are out of sync"
 
 
 def run_swiftdune(run: str, steps: str, seconds: float, cd: bool, saves: Path | None) -> Path:
@@ -154,7 +189,11 @@ def main() -> int:
         print(f"scenario {sc['name']}", flush=True)
         orig = CAPTURES / sc["original"]
         run = f"fid-{sc['name']}"
-        steps, seconds, names = translate(sc["script"], args.offset, skip_prelude=sc.get("prelude_in_script", False))
+        script, note = (Path(sc["script"]), "") if sc.get("prelude_in_script") else script_for(sc, orig)
+        if note:
+            print(f"  {note}", flush=True)
+            sc["title"] += f" ({note})"
+        steps, seconds, names = translate(script, args.offset, skip_prelude=sc.get("prelude_in_script", False))
         if sc.get("every"):
             keep = set(names[::sc["every"]]) | {n for n in names if not n.startswith("f")}
             steps = ";".join(s for s in steps.split(";") if ":shot:" not in s or s.split(":shot:")[1] in keep)

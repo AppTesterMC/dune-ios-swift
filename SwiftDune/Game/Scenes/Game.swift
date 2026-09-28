@@ -1426,6 +1426,35 @@ final class Game: DuneNode {
     }
 
 
+    /// STOP TALKING, or a click after the last line: the room's rows again.
+    private func endTalk() {
+        setNodeActive("Dialogue", false)
+        conversation = nil
+        dialogueCharacter = nil
+        dialoguePhraseOverride = nil
+        if sietchActive {
+            publishSietchUI(items: sietchRootCharacterItems())
+        } else {
+            publishMainUI()
+        }
+    }
+
+    /// A talk with a character from a room's rows (not a scene, COMM,
+    /// troop orders or the bargaining).
+    private var inRoomTalk: Bool {
+        dialogueCharacter != nil && !sceneActive && !dreaming
+            && (dialogueContext == .palace || dialogueContext == .sietch)
+    }
+
+    /// Choosing a character: the talk starts at once (the original speaks
+    /// the first line with the verbs under it; ScummVM startConversation).
+    private func beginTalk(with speaker: DuneCharacter, context: DialogueContext) {
+        beginDialogue(with: speaker, context: context)
+        if !startConversation(with: speaker) {
+            showDialogueLine()
+        }
+    }
+
     private func closeDialogueLine() {
         setNodeActive("Dialogue", false)
         dialoguePhraseOverride = nil
@@ -1483,13 +1512,7 @@ final class Game: DuneNode {
         case 138: // WHAT ?
             showDialogueLine()
         case 137:
-            dialogueCharacter = nil
-            dialoguePhraseOverride = nil
-            if sietchActive {
-                publishSietchUI(items: sietchRootCharacterItems())
-            } else {
-                publishMainUI()
-            }
+            endTalk()
         default:
             break
         }
@@ -1836,9 +1859,16 @@ final class Game: DuneNode {
             handleDesertRow(Int((event.point.y - menuRect.y) / 8))
             return
         }
-        if isOverlayActive("Dialogue") {
+        // In a room talk the verbs stay under the line: a click on them picks one.
+        if isOverlayActive("Dialogue") && !(inRoomTalk && event.point.y >= 152) {
+            // A click on the view: the next line; after the last one (or a
+            // single answer) the talk closes and the room's rows come back
+            // (the original, checked on Spice86 by the ScummVM port).
+            let roomTalk = inRoomTalk
             if conversation != nil {
-                showNextConversationPage()
+                if !showNextConversationPage() && roomTalk && inRoomTalk { endTalk() }
+            } else if roomTalk {
+                endTalk()
             } else {
                 closeDialogueLine()
             }
@@ -1899,6 +1929,9 @@ final class Game: DuneNode {
                         switch action {
                         case .close:
                             closeOverlay()
+                        case .exitGlobe:
+                            closeOverlay()
+                            if !mapActive { openMap(select: false, caption: false) }
                         case .quit:
                             engine.exitProgram(nil)
                         case .loaded:
@@ -1940,6 +1973,9 @@ final class Game: DuneNode {
                     switch action {
                     case .close:
                         closeOverlay()
+                    case .exitGlobe:
+                        closeOverlay()
+                        if !mapActive { openMap(select: false, caption: false) }
                     case .quit:
                         engine.exitProgram(nil)
                     case .loaded:
@@ -2026,7 +2062,7 @@ final class Game: DuneNode {
             // marker 8. Selecting his command returns to that room with the
             // correct person slot populated.
             guard let speaker = character(forCommandItem: mainMenuItems[index]) else { return }
-            beginDialogue(with: speaker, context: .palace)
+            beginTalk(with: speaker, context: .palace)
         case 214:
             showBook()
         default:
@@ -2098,7 +2134,7 @@ final class Game: DuneNode {
                 openMap(select: false, caption: true)
             case 109, 110, 111, 112, 113, 114, 115, 116, 117, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132:
                 guard let speaker = character(forCommandItem: rootItems[index]) else { return }
-                beginDialogue(with: speaker, context: .sietch)
+                beginTalk(with: speaker, context: .sietch)
             default:
                 break
             }
