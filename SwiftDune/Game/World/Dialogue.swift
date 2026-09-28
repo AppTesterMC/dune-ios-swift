@@ -236,6 +236,9 @@ final class Conversation {
 
     func endAfterLine() { endAfter = true }
 
+    /// Lines remain (the talk has not ended).
+    var isActive: Bool { active }
+
     /// After ACCEPT / REFUSE / ARGUE: the talk goes on (loc_19472).
     func resume() { awaitingChoice = false }
 

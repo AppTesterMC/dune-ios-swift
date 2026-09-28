@@ -53,7 +53,12 @@ final class GameText {
     private let isCD = DuneArchive.isCD
 
     /// Floppy id -> this release's COMMAND index.
+    /// Ids from 0x8000 are CD commands with no floppy counterpart (their
+    /// CD index + 0x8000, e.g. "Mixer Panel").
+    static let cdOnly = 0x8000
+
     func commandIndex(_ floppyId: Int) -> Int {
+        if floppyId >= GameText.cdOnly { return floppyId - GameText.cdOnly }
         guard isCD else { return floppyId }
         guard floppyId >= 0 && floppyId < GameText.cdCommandIds.count else { return floppyId }
         let mapped = GameText.cdCommandIds[floppyId]
@@ -93,7 +98,7 @@ final class GameText {
         let wanted = text.trimmingCharacters(in: .whitespaces)
         guard let index = commandTexts.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces).hasPrefix(wanted) }) else { return nil }
         // Returned as a floppy id, like every id the code uses.
-        return isCD ? (floppyIdByIndex[index] ?? index) : index
+        return isCD ? (floppyIdByIndex[index] ?? GameText.cdOnly + index) : index
     }
 
     /// A phrase by 0-based index in PHRASEx1/PHRASEx2, codes expanded.

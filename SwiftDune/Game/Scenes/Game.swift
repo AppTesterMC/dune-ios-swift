@@ -157,6 +157,7 @@ final class Game: DuneNode {
             return
         }
         let salIndex = record.salRoom
+        engine.logger.log(.debug, "showRoom: place type \(world.placeType) room \(world.room) sal \(salIndex) sheet slot \(record.sheetSlot) -> \(world.sheet(for: record))")
         let roomPresentation = PalaceRoom(rawValue: salIndex) ?? .porch
         let roomParams: [String: Any] = [
             "room": roomPresentation,
@@ -556,7 +557,7 @@ final class Game: DuneNode {
     /// Land: the place is discovered, Paul in its room 1 with one more
     /// ornithopter, a period per 16 cells has passed, then the room-entry
     /// lines.
-    private func arrive(periods: Int? = nil) {
+    private func arrive(periods: Int? = nil, skipped: Bool = false) {
         guard let trip = flight else { return }
         flight = nil
         landing = nil
@@ -579,7 +580,9 @@ final class Game: DuneNode {
         // location_related_to_dying_if_arriving_at_fortress (seg000:503c):
         // a place in battle takes Paul into it; a hostile one shoots him.
         if world.nightAttackCheck(at: trip.destination) == .shot { return }
-        if !world.isFloppy && !wasRiding {
+        // SKIP TO DESTINATION lands at once, without the approach clip (the
+        // original CD: the exterior 4 s after the click).
+        if !world.isFloppy && !wasRiding && !skipped {
             // CD: the approach clip first; the place when it ends.
             if findNode("VideoClip") == nil { attachNode(VideoClip()) }
             setNodeActive("VideoClip", true, .background)
@@ -1095,6 +1098,9 @@ final class Game: DuneNode {
         } else if world.placeType == Location.palace && world.room == 9, let mirror = lookAtMirrorRow {
             items.append(mirror)
         }
+        // The CD's room verbs end with Mixer Panel (CD sub_4DCB, loc_4E73),
+        // before the people; the floppy's table has no such row.
+        if let mixer = mixerPanelRow { items.append(mixer) }
         for person in world.peopleInRoom() {
             if person <= World.harah {
                 items.append(UInt16(109 + person))
@@ -1109,6 +1115,11 @@ final class Game: DuneNode {
 
     private var takeOrnithopterRow: UInt16? { GameText.shared.findCommand("TAKE AN ORNITHOPTER").map { UInt16($0) } }
     private var lookAtMirrorRow: UInt16? { GameText.shared.findCommand("LOOK AT MIRROR").map { UInt16($0) } }
+    /// CD only: the Mixer Panel row (its volume and subtitle panel, CD
+    /// seg000:a3f0, is not built).
+    private var mixerPanelRow: UInt16? {
+        world.isFloppy ? nil : GameText.shared.findCommand("Mixer Panel").map { UInt16($0) }
+    }
 
     private var inCommRoom: Bool { world.placeType == Location.palace && world.room == 8 }
 
@@ -1298,14 +1309,25 @@ final class Game: DuneNode {
 
     /// The talk rows (seg000:95xx): TALK TO ME; COME WITH ME, or STAY HERE
     /// for a companion; STOP TALKING.
+    /// The CD's talk rows are its own texts: \" TALK TO ME \" (not the
+    /// \">>>> TALK TO ME <<<<\" record the floppy id maps to) and \" WHAT ? \".
+    private var talkToMeRow: UInt16 {
+        world.isFloppy ? 133 : GameText.shared.findCommand("\" TALK TO ME").map { UInt16($0) } ?? 133
+    }
+    private var whatRow: UInt16? {
+        world.isFloppy ? nil : GameText.shared.findCommand("\" WHAT ?").map { UInt16($0) }
+    }
+
     private func talkRows(_ character: DuneCharacter) -> [UInt16] {
         // A troop not hired yet: WORK FOR ME (139); a chief: GIVE ORDERS
         // TO TROOP (136).
-        if characterNumber(character) == World.fremen { return [133, 139, 137] }
-        if characterNumber(character) == World.fremenChief { return [133, 136, 137] }
-        guard let number = characterNumber(character), number < World.fremen else { return [133, 137] }
+        let talk = talkToMeRow
+        if characterNumber(character) == World.fremen { return [talk, 139, 137] }
+        if characterNumber(character) == World.fremenChief { return [talk, 136, 137] }
+        guard let number = characterNumber(character), number < World.fremen else { return [talk, 137] }
         let with = world.w(World.personsWith) & (UInt16(1) << UInt16(number)) != 0
-        return [133, with ? 135 : 134, 137]
+        // The CD lists WHAT ? before STOP TALKING (the original's talk menu).
+        return [talk, with ? 135 : 134] + [whatRow].compactMap { $0 } + [137]
     }
 
 
@@ -1638,7 +1660,9 @@ final class Game: DuneNode {
     private func handleDialogueMenuClick(_ point: DunePoint) {
         let index = Int((point.y - menuRect.y) / 8)
         guard index >= 0 && index < dialogueMenuItems.count else { return }
-        let item = dialogueMenuItems[index]
+        var item = dialogueMenuItems[index]
+        // The CD's own TALK TO ME / WHAT ? rows run the same handlers.
+        if item == talkToMeRow { item = 133 } else if let what = whatRow, item == what { item = 138 }
 
         if dialogueContext == .troop {
             handleTroopMenu(index)
@@ -1669,7 +1693,11 @@ final class Game: DuneNode {
 
         switch item {
         case 133:
-            if let character = dialogueCharacter {
+            // TALK TO ME: the talk goes on from where it is; only once it has
+            // ended does it start again (the ScummVM port's kRowTalkMore).
+            if let talk = conversation, talk.isActive {
+                showNextConversationPage()
+            } else if let character = dialogueCharacter {
                 if !startConversation(with: character) {
                     showDialogueLine()
                 }
@@ -1876,7 +1904,7 @@ final class Game: DuneNode {
 
         if flight != nil {
             if key.specialKey == .keyReturn || key.char == " " || key.specialKey == .keyEscape {
-                arrive() // SKIP TO DESTINATION
+                arrive(skipped: true) // SKIP TO DESTINATION
             }
             return
         }
@@ -2071,7 +2099,7 @@ final class Game: DuneNode {
                 setNodeActive("Flight", false)
                 openMap(select: true, caption: false)
             } else {
-                arrive()
+                arrive(skipped: true)
             }
             return
         }
