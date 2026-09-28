@@ -115,7 +115,13 @@ final class Palace: DuneNode {
             let all = scenery.rooms[sal].commands.compactMap { $0 as? RoomMarker }.map { "\($0.index)@\($0.pt.x),\($0.pt.y)" }
             engine.logger.log(.debug, "markers of sal \(sal): \(all.joined(separator: " "))")
         }
-        markers = assignment.compactMapValues { RoomCharacter(rawValue: World.persFrame($0)) }
+        // A Fremen stands as PERS 2 x (14 + troop % 3) by its troop (seg000:913b).
+        markers = assignment.compactMapValues { person in
+            if person >= World.fremen, let troop = World.shared.troopForPerson(person) {
+                return RoomCharacter(rawValue: UInt16(2 * (World.fremen + World.fremenHead(troop))))
+            }
+            return RoomCharacter(rawValue: World.persFrame(person))
+        }
         scenery.characters = markers
         engine.logger.log(.debug, "applyPeople sal \(sal) markers \(scenery.rooms[sal].markerCount) people \(people) -> \(assignment)")
     }

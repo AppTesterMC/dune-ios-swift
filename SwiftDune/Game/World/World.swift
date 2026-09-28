@@ -655,6 +655,14 @@ final class World {
         var slots = [Int?](repeating: nil, count: markers)
         let shift = Int(b(World.markerShift))
         for person in people {
+            // The Fremen troops (14, the chiefs 15+) take the last free slot,
+            // read back as marker 0 (the original: Carthag-Harg's unhired
+            // troop stands at SIET.SAL room 4's marker 0, not (14 % 10)'s).
+            if person >= World.fremen && Game.fremenLastSlot {
+                guard let free = slots.lastIndex(where: { $0 == nil }) else { break }
+                slots[free] = person
+                continue
+            }
             var slot = (person + shift) % markers
             if slots[slot] != nil {
                 guard let free = slots.firstIndex(where: { $0 == nil }) else { break }

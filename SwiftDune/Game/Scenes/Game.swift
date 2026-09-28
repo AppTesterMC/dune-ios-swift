@@ -213,6 +213,8 @@ final class Game: DuneNode {
     /// The floppy's own Sietch node (SIET0/SIET1) instead of the generic
     /// room view; off: sietches are drawn like every place (SIET.SAL).
     static let floppySietchNode = ProcessInfo.processInfo.environment["DUNE_SIETCH_NODE"] == "1"
+    /// The Fremen troops take the last free marker slot (under test).
+    static let fremenLastSlot = ProcessInfo.processInfo.environment["DUNE_FREMEN_ROTATE"] != "1"
 
     func showCurrentPlace() {
         // The floppy's Sietch node draws SIET0/SIET1; the CD has no SIET0,
