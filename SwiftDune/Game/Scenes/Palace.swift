@@ -302,7 +302,7 @@ final class Palace: DuneNode {
         
         if let character = params["character"] {
             self.character = character as! DuneCharacter
-            characterSprite = Sprite(self.character.resourceName)
+            characterSprite = Sprite((params["portraitSheet"] as? String) ?? self.character.resourceName)
         } else if params["gameRoomID"] != nil {
             self.character = .none
             characterSprite = nil

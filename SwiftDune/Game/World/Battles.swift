@@ -750,10 +750,33 @@ extension World {
             let delta = UInt8(truncatingIfNeeded: Int(w(World.gameTime) >> 4) - Int(locationByte(index, 11)))
             if delta != 254 && delta != 255 {
                 setLocationByte(index, 10, status & ~World.statusHeld)
-                setLocationByte(index, 8, locationByte(index, 8) & 7)
+                let type = locationByte(index, 8) & 7
+                setLocationByte(index, 8, type)
                 setB(World.sietchesAvailable, b(World.sietchesAvailable) &+ 1)
+                // The troops' callback (bp 7B77, 9A4C): flag 0x20 goes, the
+                // speech flag 0x1000 comes.
                 for t in troopsAt(index) where troopByte(t.id, World.tBits) & 0x20 != 0 {
+                    setTroopByte(t.id, World.tBits, troopByte(t.id, World.tBits) & ~0x20)
                     setTroopWord(t.id, World.tSpeech, troopWord(t.id, World.tSpeech) | 0x1000)
+                }
+                // sub_99F3: the characters staying here (record word 2 is
+                // 0x80, place + 1) take the new type and room 1 or 2 (a sietch
+                // has no more), and so does Paul's position (ds:4, 0b, 8) when
+                // he is here; else they no longer match and are absent.
+                let key = UInt8(index + 1)
+                for c in 0..<12 {
+                    let r = World.characterTable + c * World.characterSize
+                    if b(r + 2) == 0x80 && b(r + 3) == key {
+                        setB(r + 1, type)
+                        if b(r) != 1 { setB(r, 2) }
+                    }
+                }
+                if b(6) == 0x80 && b(7) == key {
+                    let room: UInt8 = b(4) == 1 ? 1 : 2
+                    setB(4, room)
+                    setB(5, type)
+                    setB(0x0B, room)
+                    setB(8, type)
                 }
                 setLocationByte(index, 11, 5)
                 DuneEngine.shared.logger.log(.info, "Battle: fortress \(index) becomes a sietch")

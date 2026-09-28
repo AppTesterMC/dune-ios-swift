@@ -178,6 +178,7 @@ final class Game: DuneNode {
             params["character"] = dialogueCharacter
             params["speaker"] = (talkPerson ?? characterNumber(dialogueCharacter)) as Any
             params["expression"] = talkExpression(talkPerson)
+            params["portraitSheet"] = talkSheet(talkPerson) as Any
         }
 
         if let palaceNode = findNode("Palace") {
@@ -1488,12 +1489,16 @@ final class Game: DuneNode {
         case 10: return .feyd
         case 11: return .emperor
         case World.captain: return .captain
-        case World.fremen...:
-            // Their troop's head (seg000:913b).
-            let troop = world.troopForPerson(number) ?? 0
-            return [.fremen1, .fremen2, .fremen3][World.fremenHead(troop)]
+        case World.fremen: return .fremen1       // a troop not hired yet
+        case World.fremenChief...: return .fremen2 // a hired troop's chief
         default: return nil
         }
+    }
+
+    /// A Fremen's portrait sheet: their troop's head, FRM1-3 (seg000:913b).
+    private func talkSheet(_ number: Int?) -> String? {
+        guard let n = number, n >= World.fremen, let troop = world.troopForPerson(n) else { return nil }
+        return "FRM\(World.fremenHead(troop) + 1).HSQ"
     }
 
     /// The portrait's idle expression: a Fremen's by their troop, 0 else.

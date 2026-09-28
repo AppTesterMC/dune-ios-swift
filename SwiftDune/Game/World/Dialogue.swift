@@ -214,8 +214,13 @@ final class Conversation {
         if awaitingChoice { return nil }
         while active {
             if pageIndex < pages.count {
-                defer { pageIndex += 1 }
-                return pages[pageIndex]
+                let page = pages[pageIndex]
+                pageIndex += 1
+                // CS:A866 commits the entry when its final page is shown,
+                // before another input (a verb) can replace the talk: its
+                // action (the next phase, ...) and its said flag hold.
+                if pageIndex == pages.count { finishPending() }
+                return page
             }
             if pendingFinish {
                 finishEntry()
