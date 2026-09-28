@@ -64,6 +64,12 @@ final class Game: DuneNode {
     private var flightPoint: (latitude: Int, longitude: UInt16)?
     /// CD: the arrival clip is playing (a tap skips it).
     private var arrivalClip = false
+    /// CD: Paul's ornithopter is taking off from room 1; the flight starts after.
+    private var takeOff: (until: TimeInterval, go: () -> Void)?
+    /// CHANGE DESTINATION: the next flight starts in the air (no take-off).
+    private var changingDestination = false
+    /// CD: the route has reached the destination; the view flies on until then.
+    private var landing: TimeInterval?
     private var clock: TimeInterval = 0
     /// Paul in the open desert (ds:8 = 0xFF).
     private var inDesert = false
@@ -369,6 +375,7 @@ final class Game: DuneNode {
     /// Take off from room 1 (one ornithopter less here) and fly: one cell
     /// every 3,834 ms; a tap or SKIP TO DESTINATION lands at once.
     private func fly(to destination: Int) {
+        guard takeOffFirst({ [unowned self] in fly(to: destination) }) else { return }
         mapActive = false
         setNodeActive("FlatMap", false)
         setNodeActive("Palace", false)
@@ -384,6 +391,24 @@ final class Game: DuneNode {
         flightPoint = nil
         engine.logger.log(.info, "Flight: \(world.currentLocation) -> \(destination), \(cells) cells")
         startFlightView(from: origin, to: (Int(to.latitude), to.longitude))
+    }
+
+    /// CD: before a flight from a place, its room 1 shows Paul's ornithopter
+    /// taking off (play_travel_departure_transition, orni_anim_loop); `go`
+    /// runs when it has gone. False while it plays, true to fly at once.
+    private func takeOffFirst(_ go: @escaping () -> Void) -> Bool {
+        if takeOff != nil { return true } // the take-off is over: fly
+        let airborne = changingDestination
+        changingDestination = false
+        guard !world.isFloppy, !riding, !inDesert, !airborne else { return true }
+        if world.room != 1 { world.setRoom(1) }
+        guard parkedOrnithopters() > 0 else { return true }
+        mapActive = false
+        setNodeActive("FlatMap", false)
+        showCurrentPlace()
+        findNode("Palace")?.params = ["takeOff": true]
+        takeOff = (clock + Double(Palace.takeOffFrames) * Palace.takeOffFrameSeconds, go)
+        return false
     }
 
     /// Where a flight starts: the place, or the desert point Paul stands on.
@@ -412,6 +437,7 @@ final class Game: DuneNode {
 
     /// GO THERE FLYING AN ORNI to a desert point.
     private func fly(toLatitude latitude: Int, longitude: UInt16) {
+        guard takeOffFirst({ [unowned self] in fly(toLatitude: latitude, longitude: longitude) }) else { return }
         let origin = travelOrigin()
         let cells = world.cellDistance(fromLatitude: origin.latitude, longitude: origin.longitude,
                                        toLatitude: latitude, longitude: longitude)
@@ -446,6 +472,8 @@ final class Game: DuneNode {
     private func arrive(periods: Int? = nil) {
         guard let trip = flight else { return }
         flight = nil
+        landing = nil
+        changingDestination = false
         setNodeActive("DesertWalk", false)
         setNodeActive("Flight", false)
         setNodeActive("FlightLandscape", false)
@@ -1538,11 +1566,23 @@ final class Game: DuneNode {
             gameState.advance(elapsedTime)
         }
         clock += elapsedTime
+        if let pending = takeOff, clock >= pending.until {
+            pending.go()
+            takeOff = nil
+        }
         if let flight = flight {
             // The route lands when its cell is the destination's (the
-            // landscape flies it); the timer stays as a fallback.
+            // landscape flies it); the timer stays as a fallback. The CD's
+            // view flies on for 8.2 s first (the DNCDPRG capture: the route
+            // arrives at 133.1 s, the approach clip starts at 141.3 s).
             if let landscape = findNode("FlightLandscape") as? FlightLandscape, landscape.isActive, landscape.arrived {
-                arrive(periods: landscape.steps / 16)
+                if world.isFloppy {
+                    arrive(periods: landscape.steps / 16)
+                } else if let due = landing {
+                    if clock >= due { landing = nil; arrive(periods: landscape.steps / 16) }
+                } else {
+                    landing = clock + 8.2
+                }
             } else if clock >= flight.arrival + 10 {
                 arrive()
             }
@@ -1607,6 +1647,7 @@ final class Game: DuneNode {
 
 
     override func onKey(_ key: DuneKeyEvent) {
+        if takeOff != nil { return }
         idleTime = 0
         if isOverlayActive("Dialogue") {
             if conversation != nil {
@@ -1761,6 +1802,7 @@ final class Game: DuneNode {
 
     override func onClick(_ event: DuneMouseClickEvent) {
         idleTime = 0
+        if takeOff != nil { return }
         if arrivalClip {
             (findNode("VideoClip") as? VideoClip)?.skip()
             return
@@ -1795,6 +1837,8 @@ final class Game: DuneNode {
             // DESTINATION (row 1) back to the map.
             if menuRect.contains(event.point) && Int((event.point.y - menuRect.y) / 8) == 1 {
                 flight = nil
+                landing = nil
+                changingDestination = true
                 setNodeActive("DesertWalk", false)
                 setNodeActive("Flight", false)
                 openMap(select: true, caption: false)

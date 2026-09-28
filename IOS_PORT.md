@@ -99,6 +99,31 @@ Harness variables (see `Engine/DevHarness.swift`): `DUNE_START=game`,
 `DUNE_SCRIPT=<t>:<action>[:<arg>];...` with `key`, `click`, `hover`,
 `shot`, `place`, `point`, plus `DUNE_LOG_MARKERS` and `DUNE_LOG_MEMORY`.
 
+### Golden references from the original game
+
+The original CD program (`DNCDPRG.EXE`) runs headless in Spice86 through
+the OpenRakis-based autoplay driver kept next to the game copy. The CD
+version runs from a hard-disk folder with `DUNE.DAT`, without a CD-ROM
+drive. The driver writes 25 fps frames and data-segment dumps, which serve
+as the reference for the CD flight.
+
+`scripts/golden/dunedat.py` reads `DUNE.DAT`, unpacks HSQ and decodes HNM
+clips (a Python port of `DuneArchive` and `HnmPlayer`).
+`scripts/golden/match_flight.py DUNE.DAT FRAMES FPS T0 T1` matches every
+captured frame to a clip frame (MNT1-4, MTG1-3, SIET, PALACE, FORT...) and
+prints which clip is on screen when.
+
+Measured for the flight from the palace to Carthag-Tuek on day 1:
+
+| What | Original |
+| --- | --- |
+| Clip frame time | 80 ms (MNT1: 180 frames in 14.4 s) |
+| Clip order | MNT1, 2, 4, 2, 3, 4, 1, each played to its end |
+| Take-off | 33 frames of 100 ms (`orni_anim_loop`) in room 1, then MNT1 frame 0 and the first route step together |
+| Route step | about 3.85 s |
+| Landing | the view flies on for 8.2 s after the route arrives, then SIET plays in full, then a short dither into room 1 with the ornithopter parked (no landing animation) |
+| Outdoor rooms | the clip's flat sky (colour 199) shows the dithered sky gradient behind it |
+
 ## Gameplay ported from the ScummVM Dune engine
 
 `Game/World/`: the executable's data segment (`World`), text codes
