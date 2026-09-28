@@ -40,36 +40,49 @@ SHOTS = HERE / "build/shots"
 
 # The CD scenarios: SwiftDune's CD build against the original CD program
 # (DNCDPRG.EXE on Spice86, autoplay-cd.sh with the CD prelude that skips
-# the intro). explore and speedrun use the floppy scenarios' clicks: the CD
-# game takes them its own way (its panel has a Mixer Panel row), and
-# SwiftDune's CD build must follow it.
+# the intro), with scripts made for the CD's rows (its rooms list Mixer
+# Panel after the verbs).
 FIDELITY_SCRIPTS = Path.home() / "Cryogenic-local/tests/fidelity"
 CD_SCENARIOS = [
-    {"name": "cd-explore", "title": "CD: the day 1 tour's clicks (explore.script)", "cd": True,
-     "script": CAPTURES / "cd-explore/input.script", "original": "cd-explore"},
-    {"name": "cd-speedrun-day1", "title": "CD: the day 1 speedrun's clicks (speedrun-day1.script)", "cd": True,
-     "script": CAPTURES / "cd-speedrun/input.script", "original": "cd-speedrun"},
+    {"name": "cd-speedrun-day1", "title": "CD: the day 1 speedrun (the ScummVM port's cd-speedrun-day1.script, "
+     "made for the CD's rows)", "cd": True,
+     "script": FIDELITY_SCRIPTS / "cd-speedrun-day1.script", "original": "cd-speedrun-day1"},
     {"name": "cd-flight", "title": "CD, new game: the palace front, TAKE AN ORNITHOPTER, Carthag-Tuek on the "
      "cockpit map, take-off, flight, arrival", "cd": True, "prelude_in_script": True,
      "script": REFERENCE / "autoplay/scripts/cd/flight.script", "original": "cd-flight"},
 ]
 
 
-def translate(script: Path, offset: float, skip_prelude: bool = False) -> tuple[str, float, list[str]]:
-    """Harness script -> DUNE_SCRIPT steps, the run's length and the checkpoints."""
+def waitds_times(script: Path, capture: Path | None) -> dict[int, float]:
+    """How long each waitds line waited in the original's run, by script line."""
+    log = capture / "autoplay.log" if capture else None
+    if not log or not log.exists():
+        return {}
+    pattern = re.compile(re.escape(script.name) + r":(\d+): 'waitds [^']*' met after (\d+) ms")
+    return {int(m.group(1)): int(m.group(2)) / 1000 for m in pattern.finditer(log.read_text())}
+
+
+def translate(script: Path, offset: float, skip_prelude: bool = False,
+              capture: Path | None = None) -> tuple[str, float, list[str]]:
+    """Harness script -> DUNE_SCRIPT steps, the run's length and the checkpoints.
+    A waitds (the original waiting on its memory) takes as long as it did in
+    the capture."""
     t, steps, names = offset, [], []
-    lines = script.read_text().splitlines()
+    waited = waitds_times(script, capture)
+    lines = list(enumerate(script.read_text().splitlines(), start=1))
     if skip_prelude:
         # The CD script boots the intro and skips it (ESC twice): SwiftDune
         # starts in the throne room, at the script's first checkpoint.
-        start = next(i for i, l in enumerate(lines) if l.split()[:1] == ["checkpoint"])
+        start = next(i for i, (_, l) in enumerate(lines) if l.split()[:1] == ["checkpoint"])
         lines = lines[start:]
-    for line in lines:
+    for number, line in lines:
         tok = re.sub(r"\s#.*", "", line).split()  # inline comments
         if not tok or tok[0].startswith("#"):
             continue
         if tok[0] == "wait":
             t += int(tok[1]) / 1000
+        elif tok[0] == "waitds":
+            t += waited.get(number, 0.0)
         elif tok[0] == "click" and len(tok) >= 4:
             steps.append(f"{t:.2f}:click:{tok[2]},{tok[3]}")
         elif tok[0] == "move" and len(tok) >= 3:
@@ -105,7 +118,7 @@ def matches(script: Path, capture: Path) -> bool:
     if not script.exists():
         return False
     cap = capture_times(capture)
-    steps, _, names = translate(script, 0.0)
+    steps, _, names = translate(script, 0.0, capture=capture)
     ours = {x.split(":shot:")[1]: float(x.split(":")[0]) for x in steps.split(";") if ":shot:" in x}
     common = [n for n in names if n in cap]
     if not common or len(common) < len(names):
@@ -193,7 +206,8 @@ def main() -> int:
         if note:
             print(f"  {note}", flush=True)
             sc["title"] += f" ({note})"
-        steps, seconds, names = translate(script, args.offset, skip_prelude=sc.get("prelude_in_script", False))
+        steps, seconds, names = translate(script, args.offset, skip_prelude=sc.get("prelude_in_script", False),
+                                          capture=orig)
         if sc.get("every"):
             keep = set(names[::sc["every"]]) | {n for n in names if not n.startswith("f")}
             steps = ";".join(s for s in steps.split(";") if ":shot:" not in s or s.split(":shot:")[1] in keep)

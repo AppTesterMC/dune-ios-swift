@@ -83,6 +83,7 @@
 		E3F33E84AC532A68E0F8ADCF /* PixelBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614A6BFE79A0D88DF3EC7C6A /* PixelBuffer.swift */; };
 		E43A4A3819E97EF05D4E765F /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = D5B8917651133D736CCE5750 /* AppIcon-1024.png */; };
 		E47848355E615BE358C6D5D9 /* Video.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83B000A1E76930997D01267 /* Video.swift */; };
+		E4F960FDE206570E8EBD0024 /* Cockpit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 656A3EFA36A2FFE42FC9B166 /* Cockpit.swift */; };
 		E8488A747E7832B0A818EBA3 /* DuneIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E387EDA4831F07D1922BFA7 /* DuneIOSApp.swift */; };
 		E88E2CC29A5A1154ED1E2A9A /* Death.swift in Sources */ = {isa = PBXBuildFile; fileRef = F696A1767CFAFC7A1AF2A257 /* Death.swift */; };
 		E9B6CA422155E4D8C3D5EF57 /* Sound.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E43ACB358B4D725E8CBF867 /* Sound.swift */; };
@@ -133,6 +134,7 @@
 		5E5EBA5600EB2DFFC21C59DD /* DuneiOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DuneiOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		614A6BFE79A0D88DF3EC7C6A /* PixelBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelBuffer.swift; sourceTree = "<group>"; };
 		646FB83788BE85CCE173E510 /* WormRide.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WormRide.swift; sourceTree = "<group>"; };
+		656A3EFA36A2FFE42FC9B166 /* Cockpit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cockpit.swift; sourceTree = "<group>"; };
 		677040991DC38FD2DF88EF50 /* UI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI.swift; sourceTree = "<group>"; };
 		6D7E1DCC17CB01DA10832866 /* DialogueOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DialogueOverlay.swift; sourceTree = "<group>"; };
 		74EEB4985D34BB840F532794 /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
@@ -204,6 +206,7 @@
 				07008EFEDB1BCE59323A7BB1 /* Background.swift */,
 				7DE695E2251829A5FE77B2B1 /* Book.swift */,
 				A85DE6529940F5D8FA35FE98 /* Character.swift */,
+				656A3EFA36A2FFE42FC9B166 /* Cockpit.swift */,
 				E8DC04CF4A3FA4E803BA0D2F /* CopyProtection.swift */,
 				C8F3A7F73704B0FFBE303441 /* Credits.swift */,
 				F696A1767CFAFC7A1AF2A257 /* Death.swift */,
@@ -493,6 +496,7 @@
 				D074D0F21E47AA555F386A46 /* Battles.swift in Sources */,
 				EDB0E21F10731B3DCCD3BAB6 /* Book.swift in Sources */,
 				D51758ECDCC4E603F5F5AC28 /* Character.swift in Sources */,
+				E4F960FDE206570E8EBD0024 /* Cockpit.swift in Sources */,
 				35F233AD214026EAFA58C4AA /* CopyProtection.swift in Sources */,
 				C36960045AA22DE43AFD2E75 /* CreativeVoice.swift in Sources */,
 				B365536315BBC9CB11073537 /* Credits.swift in Sources */,

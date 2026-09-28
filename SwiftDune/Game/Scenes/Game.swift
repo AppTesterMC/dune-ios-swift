@@ -350,8 +350,7 @@ final class Game: DuneNode {
         case .exit:
             closeMap()
         case .takeOrnithopter:
-            map.params = ["select": true, "caption": false]
-            publishMapUI()
+            openCockpit()
         case .fly:
             if let destination = map.destination {
                 fly(to: destination)
@@ -422,6 +421,62 @@ final class Game: DuneNode {
         findNode("Palace")?.params = ["takeOff": true]
         takeOff = (clock + Double(Palace.takeOffFrames) * Palace.takeOffFrameSeconds, go)
         return false
+    }
+
+    // MARK: The ornithopter cockpit (TAKE AN ORNITHOPTER)
+
+    /// The cockpit's destination screen is up (Cockpit node).
+    private var cockpitActive = false
+
+    /// map_screen_open in cockpit mode: the map in the cockpit's window,
+    /// centred on Paul, one Cancel row.
+    private func openCockpit() {
+        closeMapForLoad()
+        setNodeActive("Palace", false)
+        setNodeActive("Sietch", false)
+        if findNode("Cockpit") == nil { attachNode(Cockpit()) }
+        let here = travelOrigin()
+        setNodeActive("Cockpit", true, .background)
+        findNode("Cockpit")?.params = ["longitude": here.longitude, "latitude": here.latitude,
+                                      "dayMode": gameState.phase.lightMode]
+        cockpitActive = true
+        let cancel = GameText.shared.findCommand("Cancel").map { UInt16($0) } ?? 170
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .bookClosed, rightPanel: .rect, items: [cancel], directions: [],
+            day: gameState.day, phase: gameState.phase))
+        engine.logger.log(.info, "Cockpit: select destination")
+    }
+
+    private func closeCockpit() {
+        cockpitActive = false
+        setNodeActive("Cockpit", false)
+    }
+
+    /// map_mouse_lmb_select_destination: a tap in the window flies to the
+    /// place under it (not the one Paul is at) or to the open desert there;
+    /// Cancel goes back to the pad.
+    private func handleCockpitClick(_ point: DunePoint) {
+        guard let cockpit = findNode("Cockpit") as? Cockpit else { return }
+        if menuRect.contains(point) {
+            if Int((point.y - menuRect.y) / 8) == 0 {
+                engine.logger.log(.info, "Cockpit: Cancel")
+                closeCockpit()
+                if inDesert { showDesert() } else { showCurrentPlace() }
+            }
+            return
+        }
+        let x = Int(point.x), y = Int(point.y)
+        guard Cockpit.contains(x, y) else { return }
+        if let place = cockpit.hit(x: x, y: y) {
+            if place == world.currentLocation && !inDesert { return }
+            engine.logger.log(.info, "Cockpit: destination place \(place)")
+            closeCockpit()
+            fly(to: place)
+        } else if let p = cockpit.unproject(x: x, y: y) {
+            engine.logger.log(.info, "Cockpit: destination the desert at \(p.longitude)/\(p.latitude)")
+            closeCockpit()
+            fly(toLatitude: p.latitude, longitude: p.longitude)
+        }
     }
 
     /// Where a flight starts: the place, or the desert point Paul stands on.
@@ -1891,6 +1946,11 @@ final class Game: DuneNode {
             return
         }
 
+        if cockpitActive {
+            handleCockpitClick(event.point)
+            return
+        }
+
         if mapActive && !isOverlayActive("Fresk") {
             handleMapClick(event.point)
             return
@@ -2049,7 +2109,7 @@ final class Game: DuneNode {
         }
         switch mainMenuItems[index] {
         case let row where row == takeOrnithopterRow:
-            openMap(select: true, caption: false) // choose where to fly
+            openCockpit() // choose where to fly
         case 202:
             openCommList(seen: false)
         case 203:
@@ -2128,7 +2188,7 @@ final class Game: DuneNode {
             switch rootItems[index] {
             case let row where row == takeOrnithopterRow:
                 if world.location(world.currentLocation).ornithopters > 0 {
-                    openMap(select: true, caption: false)
+                    openCockpit()
                 }
             case 141:
                 openMap(select: false, caption: true)
