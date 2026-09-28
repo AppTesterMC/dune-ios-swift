@@ -1956,8 +1956,10 @@ final class Game: DuneNode {
             return
         }
 
-        if !isOverlayActive("Fresk") && !isOverlayActive("Book") && event.point.x >= 138 && event.point.x < 182
-            && event.point.y >= 134 && event.point.y < 160 && dialogueCharacter == nil {
+        if !isOverlayActive("Fresk") && !isOverlayActive("Book") && event.point.x >= 92 && event.point.x <= 229
+            && event.point.y >= 152 && event.point.y <= 159 && dialogueCharacter == nil {
+            // The original's zone: the panel's top edge under Paul's head
+            // (92..229 x 152..159); a click on the head in the view does nothing.
             showFresk() // Paul's head: the globe and the game menu
             return
         }
@@ -2081,7 +2083,8 @@ final class Game: DuneNode {
 
         let point = event.point
 
-        if point.y >= 152 && point.x < 90 {
+        // The book (the original's zone, 24..69 x 155..176).
+        if point.x >= 24 && point.x < 70 && point.y >= 155 && point.y < 177 {
             showBook()
             return
         }

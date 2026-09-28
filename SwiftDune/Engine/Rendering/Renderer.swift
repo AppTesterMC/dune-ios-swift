@@ -30,7 +30,8 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
     private var rawBufferPointer: UnsafeMutablePointer<UInt8>
     private var shouldTakeScreenshot = false
     private var screenshotScale = 3
-    private var screenshotName: String?
+    /// Dev harness shots due at this frame (several checkpoints can fall on one).
+    private var screenshotNames: [String] = []
 
     var metalView: MTKView
     
@@ -159,7 +160,12 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         
         // Screenshots are taken one rendering to framebuffer is done
         if shouldTakeScreenshot {
-            captureToPNG(screenshotScale)
+            if screenshotNames.isEmpty {
+                captureToPNG(screenshotScale, name: nil)
+            } else {
+                for name in screenshotNames { captureToPNG(screenshotScale, name: name) }
+            }
+            screenshotNames = []
             shouldTakeScreenshot = false
         }
     }
@@ -206,12 +212,12 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
     
     func requestScreenshot(_ scale: Int = 1, name: String? = nil) {
         self.screenshotScale = scale
-        self.screenshotName = name
+        if let name = name { self.screenshotNames.append(name) }
         self.shouldTakeScreenshot = true
     }
     
     
-    private func captureToPNG(_ scale: Int) {
+    private func captureToPNG(_ scale: Int, name: String?) {
         let bytesPerPixel = 4 // ABGR has 4 bytes per pixel
         let bitsPerComponent = 8
         let bytesPerRow = self.region.size.width * bytesPerPixel
@@ -243,12 +249,11 @@ final class Renderer: NSObject, ObservableObject, MTKViewDelegate {
         var fileURL = DuneEngine.outputDirectory
             .appendingPathComponent("DuneCapture_\(date.timeIntervalSince1970)@\(scale)x.png")
 
-        if let name = screenshotName {
+        if let name = name {
             // Dev harness shots: stable names in a shots/ subfolder.
             let shots = DuneEngine.outputDirectory.appendingPathComponent("shots")
             try? FileManager.default.createDirectory(at: shots, withIntermediateDirectories: true)
             fileURL = shots.appendingPathComponent("\(name).png")
-            screenshotName = nil
         }
         
         // Create a CGImageDestination
