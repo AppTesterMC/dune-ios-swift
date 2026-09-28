@@ -51,8 +51,13 @@ timeout 120 xcrun simctl install $sim "$app"
 
 data=$(xcrun simctl get_app_container $sim $bundle data)
 rm -rf "$data/Documents/shots" "$data/Documents/dune-ios.log"
-# DUNE_SAVE_IN=<file.SAV>: put a save into Documents (DUNE_LOAD picks the slot).
-if [[ -n ${DUNE_SAVE_IN:-} ]]; then mkdir -p "$data/Documents"; cp "$DUNE_SAVE_IN" "$data/Documents/"; fi
+# DUNE_SAVE_IN=<file.SAV or folder>: put saves into Documents (DUNE_LOAD
+# or the game's LOAD GAME picks the slot); old saves there are removed.
+find "$data/Documents" -maxdepth 1 -name "DUNE*.SAV" -delete 2>/dev/null || true
+if [[ -n ${DUNE_SAVE_IN:-} ]]; then
+  mkdir -p "$data/Documents"
+  if [[ -d $DUNE_SAVE_IN ]]; then find "$DUNE_SAVE_IN" -maxdepth 1 -name "DUNE*.SAV" -exec cp {} "$data/Documents/" \; ; else cp "$DUNE_SAVE_IN" "$data/Documents/"; fi
+fi
 
 env_args=()
 # Test runs are silent (DUNE_MUTE=1; pass DUNE_MUTE=0 to hear them).
