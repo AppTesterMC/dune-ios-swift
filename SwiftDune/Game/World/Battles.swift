@@ -91,6 +91,31 @@ extension World {
         UInt16(Location.tableOffset + index * Location.recordSize)
     }
 
+    /// The place at a record offset (the inverse of placeOffset).
+    func placeIndex(_ offset: UInt16) -> Int? {
+        guard Int(offset) >= Location.tableOffset else { return nil }
+        let i = (Int(offset) - Location.tableOffset) / Location.recordSize
+        return i < locationCount ? i : nil
+    }
+
+    // MARK: The prospectors' queue (ARRAY_PTR_Location_prospector_destinations)
+
+    /// CD ds:11D3 (floppy 11E0): three place offsets, then a 0 word.
+    static let prospectorQueue = 0x11D3
+
+    func prospectorDestination(_ slot: Int) -> UInt16 {
+        slot < 3 ? w(World.prospectorQueue + 2 * slot) : 0
+    }
+
+    func setProspectorDestination(_ slot: Int, _ offset: UInt16) {
+        if slot < 3 { setW(World.prospectorQueue + 2 * slot, offset) }
+    }
+
+    /// seg000:8347: the queue moves up one, the 0 word following.
+    func shiftProspectorQueue() {
+        for k in 0..<3 { setProspectorDestination(k, w(World.prospectorQueue + 2 * (k + 1))) }
+    }
+
     private func isHarkonnen(_ id: Int) -> Bool { troopByte(id, World.tBits) & 0x80 != 0 }
     private func isLive(_ id: Int) -> Bool { troopByte(id, World.tOccupation) & 0x20 == 0 }
 
@@ -191,7 +216,22 @@ extension World {
     /// executable leaves the troop unlinked there, an original bug, spec
     /// §2.2). The UI calls it on the map's Done after picking the place.
     @discardableResult
-    func issueMoveOrder(troop id: Int, to dest: Int) -> Bool {
+    func issueMoveOrder(troop id: Int, to requested: Int) -> Bool {
+        var dest = requested
+        if id == World.prospectorTroop {
+            // prospector_sync_destination_queue (848f): the queue's head,
+            // dropping heads already reached; the argument is not used.
+            var head = prospectorDestination(0)
+            while head != 0 && head == troopWord(id, World.tLocation)
+                && troopByte(id, World.tOccupation) & World.moving == 0 {
+                shiftProspectorQueue()
+                head = prospectorDestination(0)
+            }
+            if head != 0 {
+                guard let next = placeIndex(head) else { return false }
+                dest = next
+            }
+        }
         guard id >= 1 && id <= World.troopCount, dest >= 0 && dest < locationCount else { return false }
         let occupation = troopByte(id, World.tOccupation)
         if occupation & World.moving != 0 {
@@ -287,6 +327,10 @@ extension World {
     /// troop_arrive_at_destination (seg000:8357).
     private func troopArrive(_ id: Int) {
         guard let index = troopPlace(id) else { return }
+        // seg000:8357: the prospectors drop the head they have reached.
+        if id == World.prospectorTroop && prospectorDestination(0) == World.placeOffset(index) {
+            shiftProspectorQueue()
+        }
         let d = location(index)
         setTroopWord(id, World.tLongitude, d.longitude)
         setTroopWord(id, World.tLatitude, UInt16(bitPattern: d.latitude))
@@ -867,6 +911,216 @@ extension World {
             count += 1
         }
         setB(0x60, UInt8(truncatingIfNeeded: count))
+    }
+
+    /// prepare_location_data_for_condit (seg000:331e): the place's figures
+    /// the dialogue conditions read. ds:11CE the record, 4D-5B its bytes,
+    /// 94/96 the forces and 9C their balance (33be/33d9), 5C/5E the Fremen
+    /// bitfields, 60-92 the troop counts (34a5), 53 the free equipment
+    /// (3360), F7 the companions staying there (3385), CA-E6 the nearest
+    /// places and their octants (5274). ScummVM World::stageLocationForConditions.
+    func stageLocationForConditions(_ index: Int) {
+        guard index >= 0 && index < locationCount else { return }
+        let ptr = Location.tableOffset + index * Location.recordSize
+        func l(_ k: Int) -> UInt8 { vars[ptr + k] }
+        setW(0x11CE, UInt16(ptr))
+        setW(0x4E, UInt16(l(0)) << 8 | UInt16(l(1)))
+        setB(0x50, b(0x1141 + Int(l(1))))
+        setB(0x51, l(10))
+        setB(0x52, l(18))
+        setB(0x54, l(27))
+        setB(0x4D, l(8))
+        for k in 0..<7 { setB(0x55 + k, l(20 + k)) }
+
+        // seg000:33be / 342d: each live troop's strength, (2 x motivation +
+        // army skill) x men >> 4, doubled per weapon from the laser guns on
+        // (equipment bits 5..2), >> 8, at least 1.
+        let ids = troopsAt(index).map { $0.id }
+        var harkonnen = 0, fremen = 0
+        var bits10: UInt16 = 0, bits12: UInt16 = 0
+        for id in ids where troopByte(id, World.tOccupation) & 0x20 == 0 {
+            let v = min(255, 2 * motivationModifier(id) + Int(troopByte(id, World.tArmy)))
+            let men = Int(troopByte(id, World.tPopulation))
+            var ax = (v * men) >> 4, dx = ax
+            var eq = UInt8(truncatingIfNeeded: Int(troopByte(id, World.tEquipment)) << 2)
+            var overflow = false
+            for _ in 0..<4 where !overflow {
+                dx <<= 1
+                let has = eq & 0x80 != 0
+                eq <<= 1
+                if has {
+                    ax += dx
+                    if ax > 0xFFFF { overflow = true }
+                }
+            }
+            var strength = overflow ? 0xFF : (ax >> 8) & 0xFF
+            if strength == 0 && men >= 1 { strength = 1 }
+            if isHarkonnen(id) {
+                harkonnen += strength
+            } else {
+                fremen += strength
+                bits10 |= troopWord(id, World.tBits)
+                bits12 |= troopWord(id, World.tSpeech)
+            }
+        }
+        setW(0x94, UInt16(truncatingIfNeeded: harkonnen))
+        setW(0x96, UInt16(truncatingIfNeeded: fremen))
+        setW(0x5C, bits10)
+        setW(0x5E, bits12)
+        // seg000:33d9: the balance, signed, +-0xFC.
+        let fremenAhead = fremen >= harkonnen
+        let big = fremenAhead ? fremen : harkonnen, small = fremenAhead ? harkonnen : fremen
+        var balance = 0xFC
+        if small != 0 && (big >> 8) < small { balance = min(0xFC, ((big << 8) / small) >> 1) }
+        setB(0x9C, UInt8(truncatingIfNeeded: fremenAhead ? balance : -balance))
+
+        // seg000:34a5: the counts. The block is 0x61 settled, 0x7F moving;
+        // a Fremen troop counts one lower (an unhired 0x80 in ds:90); the
+        // job counters sit at block + 1 + job for both sides.
+        for k in 0x60..<0x93 { setB(k, 0) }
+        func bump(_ k: Int) { setB(k, b(k) &+ 1) }
+        for id in ids {
+            let occupation = troopByte(id, World.tOccupation)
+            if occupation & 0x20 != 0 { continue }
+            let block = occupation & World.moving != 0 ? 0x7F : 0x61
+            var base = block
+            if !isHarkonnen(id) {
+                base -= 1
+                if occupation == 0x80 { bump(0x90); continue }
+            }
+            bump(base)
+            var job = Int(occupation & 0x0F)
+            if occupation & 3 == 3 { job &= 0xFC }
+            if block + job + 1 < 0x93 { bump(block + job + 1) }
+            if block + job < 0x7F { bump(0x71 + Int(troopByte(id, World.tSpeech) & 0x0F)) }
+        }
+        setB(0x91, b(0x60) &+ b(0x7E))
+        setB(0x92, b(0x61) &+ b(0x7F))
+
+        // seg000:3360: the free equipment as a mask (bit 7 harvesters .. bit 1 bulbs).
+        var mask: UInt8 = 0
+        for (k, count) in placeFreeEquipment(index).enumerated() where count > 0 { mask |= UInt8(0x80 >> k) }
+        setB(0x53, mask)
+
+        // seg000:3385: Gurney, Stilgar and Chani staying here (their
+        // record's place word (index + 1) << 8 | 0x80), unless Paul is here.
+        setB(0xF7, 0)
+        if index != currentLocation {
+            let here = UInt16(index + 1) << 8 | 0x80
+            for record in [0x1018, 0x1028, 0x1048] where rawW(record + 2) == here {
+                setB(0xF7, b(0xF7) | UInt8(1 << (vars[record + 0xE] & 7)))
+            }
+        }
+
+        // seg000:5274: the nearest place (ds:CA/CC), known sietch (D0/D2),
+        // hidden sietch the story lets be found (D6/D8), held fortress
+        // (DC/DE) and hidden fortress (E2/E4), by max(|dlng| >> 8, |dlat|);
+        // each one's compass octant in the byte after its pointer, and
+        // ds:11FD the findable sietch's compass-point phrase (0xDA + octant).
+        let slots = [0xCA, 0xD0, 0xD6, 0xDC, 0xE2]
+        for k in slots { setW(k, 0xFFFF); setW(k + 2, 0) }
+        let lng0 = Int(rawW(ptr + 2)), lat0 = Int(Int16(bitPattern: rawW(ptr + 4)))
+        for i in 0..<locationCount where i != index {
+            let o = Location.tableOffset + i * Location.recordSize
+            let dlng = abs(Int(rawW(o + 2)) - lng0) >> 8
+            let dlat = abs(Int(Int16(bitPattern: rawW(o + 4))) - lat0)
+            let d = max(dlng, dlat)
+            let slot: Int
+            if vars[o + 8] >= 0x28 {
+                slot = vars[o + 10] & 0x80 != 0 ? 0xE2 : 0xDC
+            } else if vars[o + 10] & 0x80 == 0 {
+                slot = 0xD0
+            } else if b(World.phase) >= vars[o + 11] {
+                slot = 0xD6
+            } else {
+                continue
+            }
+            if d < Int(w(slot)) { setW(slot, UInt16(d)); setW(slot + 2, UInt16(o)) }
+            if d < Int(w(0xCA)) { setW(0xCA, UInt16(d)); setW(0xCC, UInt16(o)) }
+        }
+        for k in slots {
+            let p = Int(w(k + 2))
+            guard p >= Location.tableOffset else { continue }
+            let h = World.heading(lng0, lat0, Int(rawW(p + 2)), Int(Int16(bitPattern: rawW(p + 4))))
+            let octant = ((h &+ 0x10) >> 5) & 7
+            setB(k + 4, octant)
+            if k == 0xD6 { setW(0x11FD, 0xDA + UInt16(octant)) }
+        }
+    }
+
+    /// sub_15133: the heading from (lng0, lat0) to (lng1, lat1), 0x40 per
+    /// quarter turn, as the executable measures it.
+    static func heading(_ lng0: Int, _ lat0: Int, _ lng1: Int, _ lat1: Int) -> UInt8 {
+        var bx = lat1 - lat0
+        var dx = Int(Int16(truncatingIfNeeded: lng1 - lng0)) // 16-bit longitudes wrap
+        if bx < -0x80 || bx >= 0x80 { bx >>= 1; dx >>= 1 }
+        bx = Int(Int16(truncatingIfNeeded: bx << 8))
+        let ax = abs(bx), cx = abs(dx)
+        if cx >= ax {
+            if cx < 1 { return 0 }
+            let q = (0x20 * bx) / dx
+            return UInt8(truncatingIfNeeded: q + (dx < 0 ? 0xC0 : 0x40))
+        }
+        if ax < 1 { return 0 }
+        var q = (0x20 * dx) / bx
+        if bx >= 0 { q -= 0x80 }
+        return UInt8(truncatingIfNeeded: -q)
+    }
+
+    /// troop_prepare_troop_data_for_condit (seg000:31f6): the troop's
+    /// figures at ds:2C-4B and the name-table words its lines read (0x81/
+    /// 0x82 the place, 0x84 the job, 0x85 how long, 0x86-0x88 the skill
+    /// ranks), then its place's (331e). The CD's COMMAND ids (0x18 + job,
+    /// 112-116, 0xD1 + rank) differ on the floppy, so the bases are found
+    /// by text. ScummVM GameScreen::stageTroopForConditions.
+    func stageTroopForConditions(_ id: Int) {
+        guard id >= 1 && id <= World.troopCount else { return }
+        let occupation = troopByte(id, World.tOccupation)
+        let location = troopWord(id, World.tLocation)
+        setW(0x2C, location)
+        setB(0x2E, troopByte(id, 0))
+        setB(0x30, occupation)
+        setB(0x2F, occupation & 0x0F)
+        setW(0x32, troopWord(id, World.tBits))
+        setW(0x34, troopWord(id, World.tSpeech))
+        setB(0x31, troopByte(id, World.tSpeech) & 0x0F)
+        setB(0x36, UInt8(truncatingIfNeeded: motivationModifier(id)))
+        setB(0x37, troopByte(id, 0x16 + min(2, Int(occupation & 0x0C) >> 2)))
+        setB(0x38, troopByte(id, 0x16))
+        setB(0x39, troopByte(id, 0x17))
+        setB(0x3A, troopByte(id, 0x18))
+        setB(0x3B, troopByte(id, World.tEquipment))
+        setB(0x3C, troopByte(id, World.tPopulation)) // population / 10
+        setB(0x40, UInt8(truncatingIfNeeded: Int(w(World.gameTime) >> 4) - Int(troopByte(id, 0x14))))
+        setW(0x44, troopWord(id, World.tDepC))
+        setW(0x46, troopWord(id, World.tDepE))
+        setW(0x48, UInt16(truncatingIfNeeded: harvestRate(id)))
+        let names = nameTable
+        func setName(_ slot: Int, _ value: UInt16) {
+            setRawB(names + 2 * slot, UInt8(value & 0xFF))
+            setRawB(names + 2 * slot + 1, UInt8(value >> 8))
+        }
+        if let index = placeIndex(location) {
+            stageLocationForConditions(index) // 31f6 ends with the troop's place
+            let l = self.location(index)
+            setName(1, UInt16(l.firstName))
+            setName(2, 12 + UInt16(l.lastName))
+        }
+        // 1-based ids of this release's COMMAND file, as the name table holds them.
+        let text = GameText.shared
+        func base(_ caption: String) -> UInt16 {
+            text.findCommand(caption).map { UInt16(text.commandIndex($0) + 1) } ?? 0
+        }
+        setName(4, base("Spice Mining") + UInt16(occupation & 0x0F))
+        // The duration phrase (sub_132c7; its thresholds are not transcribed):
+        // "for a very short time" ... "for 12 days", or "but our job is finished".
+        let periods = Int(w(World.gameTime) &- troopWord(id, World.tTime))
+        let step = occupation & TroopJob.stopped != 0 ? 4 : periods < 4 ? 0 : periods < 16 ? 1 : periods < 96 ? 2 : 3
+        setName(5, base("for a very short time") + UInt16(step))
+        let ranks = base("On trial")
+        for (slot, skill) in [(6, 0x16), (7, 0x17), (8, 0x18)] {
+            setName(slot, ranks + UInt16(min(5, Int(troopByte(id, skill)) >> 4)))
+        }
     }
 
 

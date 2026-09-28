@@ -254,6 +254,10 @@ extension World {
             DuneEngine.shared.logger.log(.info, "Troops: troop \(id) prospected place \(index)")
         }
         setTroopWord(id, 0x0E, 100)
+        // seg000:9d5f: the prospectors march on to their queue's next place.
+        if id == World.prospectorTroop && prospectorDestination(0) != 0 && issueMoveOrder(troop: id, to: 0) {
+            return
+        }
         setTroopByte(id, 3, troopByte(id, 3) | TroopJob.stopped)
     }
 
