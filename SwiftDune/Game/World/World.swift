@@ -227,7 +227,9 @@ final class World {
     static let personsWith = 0x10
     static let charisma = 0x29
     static let phase = 0x2A
-    static let markerShift = 0xC7
+    /// The room rotation (CD sub_13D83: ch = ds:C5 & 0x0F), a random byte
+    /// drawn at each landing (CD loc_14FB0; traced by the ScummVM port).
+    static let markerShift = 0xC5
 
     /// The data segment. Initially the executable's, later a save's.
     private(set) var vars = [UInt8](repeating: 0, count: World.size)
@@ -653,16 +655,8 @@ final class World {
     func markerAssignment(people: [Int], markers: Int) -> [Int: Int] {
         guard markers > 0 else { return [:] }
         var slots = [Int?](repeating: nil, count: markers)
-        let shift = Int(b(World.markerShift))
+        let shift = Int(b(World.markerShift) & 0x0F)
         for person in people {
-            // The Fremen troops (14, the chiefs 15+) take the last free slot,
-            // read back as marker 0 (the original: Carthag-Harg's unhired
-            // troop stands at SIET.SAL room 4's marker 0, not (14 % 10)'s).
-            if person >= World.fremen && Game.fremenLastSlot {
-                guard let free = slots.lastIndex(where: { $0 == nil }) else { break }
-                slots[free] = person
-                continue
-            }
             var slot = (person + shift) % markers
             if slots[slot] != nil {
                 guard let free = slots.firstIndex(where: { $0 == nil }) else { break }

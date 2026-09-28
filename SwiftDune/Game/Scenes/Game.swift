@@ -213,8 +213,6 @@ final class Game: DuneNode {
     /// The floppy's own Sietch node (SIET0/SIET1) instead of the generic
     /// room view; off: sietches are drawn like every place (SIET.SAL).
     static let floppySietchNode = ProcessInfo.processInfo.environment["DUNE_SIETCH_NODE"] == "1"
-    /// The Fremen troops take the last free marker slot (under test).
-    static let fremenLastSlot = ProcessInfo.processInfo.environment["DUNE_FREMEN_ROTATE"] != "1"
 
     func showCurrentPlace() {
         // The floppy's Sietch node draws SIET0/SIET1; the CD has no SIET0,
@@ -574,6 +572,9 @@ final class Game: DuneNode {
         }
         world.discover(trip.destination)
         world.setPosition(location: trip.destination, room: 1)
+        // The room rotation for this visit (CD loc_14FB0: mov ds:C5, rand).
+        world.setB(World.markerShift, UInt8(truncatingIfNeeded: world.randMasked(0xFF)))
+        engine.logger.log(.info, "Landing: room rotation ds:C5 = \(world.b(World.markerShift)), seed \(world.w(0x00))")
         if !riding { world.adjustOrnithopters(trip.destination, 1) }
         let wasRiding = riding
         riding = false
