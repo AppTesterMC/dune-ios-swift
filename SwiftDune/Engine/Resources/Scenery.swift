@@ -61,7 +61,7 @@ struct RoomPolygon: RoomCommandProtocol {
 
 
 struct RoomSprite: RoomCommandProtocol {
-    var spriteID: UInt8
+    var spriteID: UInt16
     var pt: DunePoint
     var paletteOffset: UInt8
     var flipX: Bool
@@ -223,7 +223,9 @@ final class Scenery {
                     let flipX = (modificator & 0x40 != 0)
                     let scaleFactor = Int((modificator & 0x1C) >> 2)
                     
-                    if command == 0x01 {
+                    // A marker is exactly (id | modifier << 8) & 0x1FF == 1: with
+                    // the modifier's bit 0 it is sprite 0x100 (the 9-bit id).
+                    if command == 0x01 && modificator & 0x01 == 0 {
                         let roomMarker = RoomMarker(
                             index: markerIndex,
                             pt: DunePoint(x, y),
@@ -239,7 +241,7 @@ final class Scenery {
                         //engine.logger.log(.debug, " - Marker: x=\(x), y=\(y), flipX=\(flipX), flipY=\(flipY), scaleFlag=\(scaleFactor), modificator=\(String.fromByte(modificator))")
                     } else {
                         let roomSprite = RoomSprite(
-                            spriteID: command - 1,
+                            spriteID: (UInt16(command) | UInt16(modificator & 0x01) << 8) - 1,
                             pt: DunePoint(x, y),
                             paletteOffset: paletteOffset,
                             flipX: flipX,

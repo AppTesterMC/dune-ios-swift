@@ -111,6 +111,10 @@ final class Palace: DuneNode {
             }
         }
         personAt = assignment
+        if ProcessInfo.processInfo.environment["DUNE_LOG_MARKERS"] != nil {
+            let all = scenery.rooms[sal].commands.compactMap { $0 as? RoomMarker }.map { "\($0.index)@\($0.pt.x),\($0.pt.y)" }
+            engine.logger.log(.debug, "markers of sal \(sal): \(all.joined(separator: " "))")
+        }
         markers = assignment.compactMapValues { RoomCharacter(rawValue: World.persFrame($0)) }
         scenery.characters = markers
         engine.logger.log(.debug, "applyPeople sal \(sal) markers \(scenery.rooms[sal].markerCount) people \(people) -> \(assignment)")
@@ -166,13 +170,18 @@ final class Palace: DuneNode {
     /// the speaker's marker: its top-left is the marker's point (measured on
     /// the original floppy: Leto's marker 186,53 and Jessica's 191,57 give
     /// the best 4x match, 10.7 and 21 against 51+ for other factors).
+    /// The talk's zoom stays where it began: a troop hired mid-talk turns
+    /// into its chief and moves to another marker, the view does not.
+    private var talkZoomAt: DunePoint?
+
     private var speakerZoom: DuneRect? {
         guard characterSprite != nil, let who = speaker, let scenery = palaceScenery, let sal = salRoomIndex,
-              sal >= 0 && sal < scenery.rooms.count else { return nil }
-        var p = DunePoint(160, 60)
-        if let j = personAt.first(where: { $0.value == who })?.key,
+              sal >= 0 && sal < scenery.rooms.count else { talkZoomAt = nil; return nil }
+        var p = talkZoomAt ?? DunePoint(160, 60)
+        if talkZoomAt == nil, let j = personAt.first(where: { $0.value == who })?.key,
            let marker = scenery.rooms[sal].commands.compactMap({ $0 as? RoomMarker }).first(where: { $0.index == j }) {
             p = marker.pt
+            talkZoomAt = p
         }
         let x0 = min(max(Int(p.x), 0), 240), y0 = min(max(Int(p.y), 0), 114)
         return DuneRect(Int16(x0), Int16(y0), 80, 38)

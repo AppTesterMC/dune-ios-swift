@@ -127,20 +127,32 @@ enum DuneLightMode: Equatable {
     case custom(index: Int, prevIndex: Int, blend: CGFloat)
     
     /// The sky record of the light (SKY.HSQ / SKYDN.HSQ alternates).
-    /// On the floppy the palace's records of days 0-1 (variant 0 of SKY.HSQ's
-    /// five: record 8 + index, matched against the original's palette in
-    /// the captures): sunrise 4, day 1, evening 2, night 3. The variant grows
-    /// as the game goes on (days 1-4 show 1-4); what picks it is not decoded.
-    /// The CD's SKYDN records: sunrise 16, day 1, sunset 6, night 3.
+    /// The sky record of the light. The floppy's SKY.HSQ holds six variants
+    /// of (day, evening, night, sunrise), record 8 + 4 x variant + 1..4;
+    /// matched against the original's palette in every capture, the
+    /// variant follows the day (days 0-6: 0, 1, 2, 3, 4, 5, 5) with some
+    /// exceptions not decoded. The CD's SKYDN records: sunrise 16, day 1,
+    /// sunset 6, night 3.
     var skyIndex: Int {
-        let floppy = World.shared.isFloppy
-        switch self {
-        case .sunrise: return floppy ? 4 : 16
-        case .day: return 1
-        case .sunset: return floppy ? 2 : 6
-        case .night: return 3
-        case .custom(let index, _, _): return index
+        if case .custom(let index, _, _) = self { return index }
+        let world = World.shared
+        guard world.isFloppy else {
+            switch self {
+            case .sunrise: return 16
+            case .sunset: return 6
+            case .night: return 3
+            default: return 1
+            }
         }
+        let variant = min(Int(world.w(World.gameTime) >> 4), 5)
+        let base: Int
+        switch self {
+        case .sunrise: base = 4
+        case .sunset: base = 2
+        case .night: base = 3
+        default: base = 1
+        }
+        return 4 * variant + base
     }
 
     var asInt: UInt32 {
