@@ -709,9 +709,13 @@ final class Game: DuneNode {
             // To period 12 (evening) or to the next period 0 (morning). The
             // wait counts as idle time for the first vision.
             let target = world.hour < 11 ? 12 : 16
+            let before = gameState.phase.lightMode
             gameState.passPeriods(target - world.hour)
             idleTime += 5
             showDesert()
+            // The original redraws from black and then blends the light
+            // (measured on the floppy: captures/evening).
+            findNode("OpenDesert")?.params = ["lightFrom": before.skyIndex, "lightTo": gameState.phase.lightMode.skyIndex]
         case .worm:
             setNodeActive("OpenDesert", false)
             openMap(select: true, caption: false, riding: true)

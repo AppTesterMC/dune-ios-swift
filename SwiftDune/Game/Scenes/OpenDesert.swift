@@ -31,10 +31,41 @@ final class OpenDesert: DuneNode {
         landscape = nil
     }
 
-    /// Params: "longitude", "latitude", "fine".
+    /// WAIT FOR EVENING / MORNING: the old light's sky record, the new one,
+    /// and the time since (the view fades in from black over 1.5 s, holds
+    /// until 2.5 s, then blends to the new light by 6.75 s: the original
+    /// floppy, measured every 0.5 s in captures/evening).
+    private var lightChange: (from: Int, to: Int, time: TimeInterval)?
+
+    /// Params: "longitude", "latitude", "fine"; "lightFrom", "lightTo".
     override func onParamsChange() {
         if let lng = params["longitude"] as? UInt16, let lat = params["latitude"] as? Int {
             position = (lng, lat, params["fine"] as? Int ?? 0)
+        }
+        if let from = params["lightFrom"] as? Int, let to = params["lightTo"] as? Int {
+            lightChange = (from, to, 0)
+        }
+    }
+
+    override func update(_ elapsedTime: TimeInterval) {
+        if let c = lightChange { lightChange = (c.from, c.to, c.time + elapsedTime) }
+    }
+
+    private var lightMode: DuneLightMode {
+        guard let c = lightChange else { return GameState.shared.phase.lightMode }
+        let blend = min(1, max(0, (c.time - 2.5) / 4.25))
+        return .custom(index: c.to, prevIndex: c.from, blend: CGFloat(blend))
+    }
+
+    /// The fade from black of the first 1.5 s: the view's colours scaled.
+    private func fadeIn() {
+        guard let c = lightChange, c.time < 1.5 else { return }
+        let k = c.time / 1.5
+        let p = DuneEngine.shared.palette.rawPointer
+        for i in 1..<240 {
+            let v = p[i]
+            let r = UInt32(Double(v & 0xFF) * k), g = UInt32(Double((v >> 8) & 0xFF) * k), b = UInt32(Double((v >> 16) & 0xFF) * k)
+            p[i] = (v & 0xFF000000) | b << 16 | g << 8 | r
         }
     }
 
@@ -43,7 +74,8 @@ final class OpenDesert: DuneNode {
     /// y 77, the landscape (ScummVM drawWalkView).
     override func render(_ buffer: PixelBuffer) {
         guard let sky = sky else { return }
-        sky.lightMode = GameState.shared.phase.lightMode
+        sky.lightMode = lightMode
+        defer { fadeIn() }
         guard let landscape = landscape, let p = position else {
             sky.render(buffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
             Primitives.fillRect(DuneRect(0, 78, 320, 74), 190, buffer, isOffset: false)

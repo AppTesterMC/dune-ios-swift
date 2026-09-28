@@ -55,16 +55,10 @@ final class Sky {
         }
         
         switch lightMode {
-        case .sunrise:
-            setAlternate(16)
-        case .day:
-            setAlternate(1)
-        case .sunset:
-            setAlternate(6)
-        case .night:
-            setAlternate(3)
         case .custom(let index, let prevIndex, let blend):
             setAlternate(index, prevIndex, blend: blend)
+        default:
+            setAlternate(lightMode.skyIndex)
         }
 
     }
