@@ -64,6 +64,9 @@ final class Palace: DuneNode {
     private var zoomRect: DuneRect?
     /// The person speaking (a talk): the view zooms onto their marker.
     private var speaker: Int?
+    /// The palace plan is open over the view (ui_draw_palace_plan).
+    private var plan = false
+    private lazy var planSprite = Sprite("PALPLAN.HSQ")
     /// The portrait's animation (a Fremen's expression by troop; 0 else).
     private var expression: UInt16 = 0
     /// Marker index -> person number, from applyPeople.
@@ -114,6 +117,51 @@ final class Palace: DuneNode {
     }
     
     
+    /// ui_draw_palace_plan (CD seg000:18ee, the ScummVM port's
+    /// drawPalacePlan): the window (160,0)-(320,116) in 0xF1 framed by four
+    /// rings (0xF7, 0xF5, 0xF3, 0xF1), PALPLAN's frames from the list at
+    /// ds:120B (frame, x, y words up to 0xFFFF), then the marks (sub_11948):
+    /// per room 2-12 the people of this place standing there, in two rows
+    /// by their record's flag 0x40, Gurney left out in phases 0x15-0x1F, and
+    /// Paul's room's red mark.
+    private func drawPalacePlan(_ buffer: PixelBuffer) {
+        let w = World.shared
+        Primitives.fillRect(DuneRect(160, 0, 160, 116), 0xF1, buffer, isOffset: false)
+        for k in 0..<4 {
+            let x0 = Int16(163 - k), y0 = Int16(3 - k), x1 = Int16(316 + k), y1 = Int16(112 + k), c = 0xF7 - 2 * k
+            Primitives.drawLine(DunePoint(x0, y0), DunePoint(x1, y0), c, buffer, isOffset: false)
+            Primitives.drawLine(DunePoint(x0, y1), DunePoint(x1, y1), c, buffer, isOffset: false)
+            Primitives.drawLine(DunePoint(x0, y0), DunePoint(x0, y1), c, buffer, isOffset: false)
+            Primitives.drawLine(DunePoint(x1, y0), DunePoint(x1, y1), c, buffer, isOffset: false)
+        }
+        var list = 0x120B
+        for _ in 0..<16 {
+            let frame = w.w(list)
+            if frame == 0xFFFF { break }
+            planSprite.drawFrame(frame, x: Int16(bitPattern: w.w(list + 2)), y: Int16(bitPattern: w.w(list + 4)), buffer: buffer)
+            list += 6
+        }
+        var counts = [Int](repeating: 0, count: 36)
+        let phase = w.b(World.phase)
+        for i in 0..<16 {
+            let c = World.characterTable + i * World.characterSize
+            guard w.b(c + 3) == w.b(7) else { continue }
+            if w.b(c + 14) == 4 && phase >= 0x15 && phase < 0x20 { continue }
+            let index = Int(w.b(c)) - 1 + (w.b(c + 15) & 0x40 != 0 ? 12 : 0)
+            if index >= 0 && index < 24 { counts[index] += 1 }
+        }
+        let paulRoom = Int(w.b(4))
+        if paulRoom <= 12 { counts[0x17 + paulRoom] = 1 }
+        let originX = Int(Int16(bitPattern: w.w(0x120B + 2))), originY = Int(Int16(bitPattern: w.w(0x120B + 4)))
+        for r in 1..<12 {
+            let x = originX + Int(w.b(0x1426 + 2 * (r - 1))) + 3
+            let y = originY + Int(w.b(0x1426 + 2 * (r - 1) + 1)) + 2
+            for k in 0..<min(counts[r], 5) { planSprite.drawFrame(2, x: Int16(x + 4 * k), y: Int16(y), buffer: buffer) }
+            for k in 0..<min(counts[r + 12], 5) { planSprite.drawFrame(2, x: Int16(x + 4 * k), y: Int16(y + 7), buffer: buffer) }
+            if counts[r + 24] != 0 { planSprite.drawFrame(1, x: Int16(x + 9), y: Int16(y + 3), buffer: buffer) }
+        }
+    }
+
     /// While a line is spoken the view is the room zoomed four times from
     /// the speaker's marker: its top-left is the marker's point (measured on
     /// the original floppy: Leto's marker 186,53 and Jessica's 191,57 give
@@ -260,6 +308,9 @@ final class Palace: DuneNode {
             characterSprite = nil
         }
         
+        if params.keys.contains("plan") || params["gameRoomID"] != nil {
+            plan = params["plan"] as? Bool ?? false
+        }
         if params.keys.contains("speaker") || params["gameRoomID"] != nil {
             speaker = params["speaker"] as? Int
             expression = UInt16(params["expression"] as? Int ?? 0)
@@ -435,6 +486,8 @@ final class Palace: DuneNode {
         if parked.count > 0 && World.shared.isFloppy && (isGameplayExterior || gameRoomID != nil) {
             ornithopter.setPalette()
         }
+
+        if plan { drawPalacePlan(intermediateFrameBuffer) }
 
         if let characterSprite = characterSprite {
             characterSprite.setPalette()

@@ -73,6 +73,8 @@ final class Game: DuneNode {
     private var clock: TimeInterval = 0
     /// Paul in the open desert (ds:8 = 0xFF).
     private var inDesert = false
+    /// The palace plan is open (its menu is Done alone).
+    private var palacePlan = false
     /// CALL A WORM chose the map: the next trip rides a worm (no ornithopter).
     private var riding = false
     /// MOVE TROOP chose the map: the destination is the troop's (map "Done").
@@ -162,6 +164,7 @@ final class Game: DuneNode {
             "gameRoomID": currentGameRoom,
             "sheet": world.sheet(for: record),
             "people": world.peopleInRoom(companions: false), // companions are not drawn
+            "plan": palacePlan,
             "salFile": World.salFile(world.placeType),
             "outdoor": world.isOutdoors(record, placeType: world.placeType),
             // CD: outdoor rooms (not the palace balcony, SAL 10) are the
@@ -2203,6 +2206,18 @@ final class Game: DuneNode {
             return
         }
 
+        // The palace plan's dot in the compass box (UI ds:1CBC, handler
+        // seg000:18EE): only in the Atreides palace, not its first room; a
+        // second click closes it. Checked before the arrows.
+        if point.x >= 269 && point.x < 281 && point.y >= 173 && point.y < 182
+            && world.currentLocation == 0 && world.room != 1 && !inDesert {
+            palacePlan.toggle()
+            engine.logger.log(.info, palacePlan ? "Palace plan: open" : "Palace plan: closed")
+            showRoom()
+            publishMainUI()
+            return
+        }
+
         if point.y >= 152 && point.x >= 228 {
             if let direction = panelDirection(at: point) {
                 moveRoom(direction)
@@ -2229,6 +2244,11 @@ final class Game: DuneNode {
             openCockpit() // choose where to fly
         case let row where row == lookAtMirrorRow:
             showMirror()
+        case let row where palacePlan && row == planDoneRow:
+            palacePlan = false
+            engine.logger.log(.info, "Palace plan: closed")
+            showRoom()
+            publishMainUI()
         case 202:
             openCommList(seen: false)
         case 203:
@@ -2381,8 +2401,11 @@ final class Game: DuneNode {
     }
 
 
+    /// The plan's only row (menu ds:2012).
+    private var planDoneRow: UInt16? { GameText.shared.findCommand("Done").map { UInt16($0) } }
+
     private func publishMainUI() {
-        mainMenuItems = roomCharacterItems()
+        mainMenuItems = palacePlan ? [planDoneRow].compactMap { $0 } : roomCharacterItems()
         mainMenuCaptions = nil
         let directions = roomDirections()
 
@@ -2425,6 +2448,7 @@ final class Game: DuneNode {
             walkOut(exits[direction.rawValue])
             return
         }
+        palacePlan = false // the plan closes when the room changes
 
         switch RoomRecord.decode(exits[direction.rawValue]) {
         case .room(let room):
