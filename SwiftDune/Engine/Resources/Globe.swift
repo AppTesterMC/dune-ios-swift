@@ -221,17 +221,19 @@ final class Globe {
     }
     
     
+    /// SEE RESULTS: the cells coloured by who holds them.
+    var results = false
+
+    /// A cell's colour: the terrain nibble in the 0x10 bank; in results
+    /// the live map's ownership bits choose the bank, Atreides (vegetation
+    /// too) 0x20, Harkonnen 0x30 (floppy DUNEVGA:1DA3).
     private func mapColor(_ offset: Int16) -> UInt8 {
         let mapIndex = 0x62FC + Int(offset)
-        let mapValue = self.map[mapIndex]
-        let flags = (mapValue >> 4) & 3
-        var color = mapValue & 0x0f
-
-        if flags == 0x10 && color < 8 {
-           color += 12
-        }
-
-        return color + 0x10
+        let live = World.shared.map
+        let cell = mapIndex >= 0 && mapIndex < live.count ? live[mapIndex] : (mapIndex >= 0 && mapIndex < map.count ? map[mapIndex] : 0)
+        let stage = cell & 0x30
+        let bank: UInt8 = results && stage != 0 ? (stage == 0x30 ? 0x30 : 0x20) : 0x10
+        return (cell & 0x0F) | bank
     }
     
     

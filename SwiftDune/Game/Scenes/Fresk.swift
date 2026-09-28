@@ -43,7 +43,14 @@ final class Fresk: DuneNode {
     /// LOOK AT MIRROR (seg000:0ea6): MIRROR.HSQ and Paul's face instead of
     /// the globe; the menu RESTART / LOAD / SAVE / EXIT GAME / Look away.
     private(set) var mirror = false
+    /// The Globe renderer's tilt runs the other way from the map's latitude.
+    static let globeTiltSign = Int(ProcessInfo.processInfo.environment["DUNE_GLOBE_TILT_SIGN"] ?? "-1") ?? -1
     private var mirrorSprite: Sprite?
+    private var iconSprite: Sprite?
+    /// SEE RESULTS: how far the house panels have slid (0...100) and where
+    /// they are going (0.8 s either way).
+    private var resultsOpen: Double = 0
+    private var resultsTarget: Double = 0
     private var paulSprite: Sprite?
     
     private var panelState: FreskPanelState = .closed {
@@ -71,10 +78,19 @@ final class Fresk: DuneNode {
         freskSprite = Sprite("FRESK.HSQ")
         globe = Globe()
         globe?.beginInteractiveControl()
+        // Centred on Paul's place, at least 32 rows from the equator (floppy
+        // CS:B983-B995; the ScummVM port's MapScreen::centreOn).
+        let here = World.shared.location(World.shared.currentLocation)
+        var tilt = min(max(Int(here.latitude), -96), 96)
+        tilt = tilt < 0 ? min(tilt, -32) : max(tilt, 32)
+        globe?.setOrientation(tilt: Int16(Fresk.globeTiltSign * tilt), rotation: here.longitude)
         font = GameFont()
         commands = Sentence(.command, language: .english)
+        iconSprite = Sprite("ICONES.HSQ")
         menuMode = .globe
         mirror = false
+        resultsOpen = 0
+        resultsTarget = 0
     }
 
     /// Params: "mirror": true shows the mirror.
@@ -108,6 +124,8 @@ final class Fresk: DuneNode {
         }
         
         globe.update(currentTime)
+        let step = elapsedTime * 100 / 0.8
+        resultsOpen = resultsTarget > resultsOpen ? min(resultsTarget, resultsOpen + step) : max(resultsTarget, resultsOpen - step)
         publishMenuState(recomputeRows: false)
     }
 
@@ -205,17 +223,16 @@ final class Fresk: DuneNode {
 
         freskSprite.setPalette()
 
-        if menuMode == .results {
-            renderResults(buffer)
-            return
-        }
-        
-        Primitives.fillRect(DuneRect(0, 0, 319, 152), 241, buffer, isOffset: false)
-        
-        renderHousesPanels(buffer)
-        
+        // Floppy CS:B749: fill 0xF1, the ring, the globe (in results by
+        // owner), then B77D the house panels slid apart by up to 112 px.
+        Primitives.fillRect(DuneRect(0, 0, 320, 152), 241, buffer, isOffset: false)
         freskSprite.drawFrame(2, x: 91, y: 20, buffer: buffer)
+        globe.results = resultsOpen > 0
         globe.render(buffer: buffer)
+        let slide = Int16(resultsOpen * 112 / 100)
+        freskSprite.drawFrame(0, x: -slide, y: 0, buffer: buffer)
+        freskSprite.drawFrame(1, x: 214 + slide, y: 0, buffer: buffer)
+        if resultsOpen >= 100 { renderResults(buffer) }
     }
 
 
@@ -266,54 +283,69 @@ final class Fresk: DuneNode {
     }
 
 
+    /// The results (floppy seg000:b96b, the ScummVM port's drawResults):
+    /// the day and charisma, each side's share of the map, spice and men in
+    /// the small font, and six gauges (ICONES 0x37 Harkonnen / 0x38
+    /// Atreides bars, 0x39 cap), in the panels' place.
     private func renderResults(_ buffer: PixelBuffer) {
-        guard let freskSprite = freskSprite,
-              let font = font,
-              let commands = commands else {
-            return
+        guard let font = font, let icons = iconSprite else { return }
+        let world = World.shared
+        // seg000:bfe3: (cell & 0x30) == 0x30 Harkonnen, any other stage Atreides.
+        var harkonnen = 0, atreides = 0, cells = 0
+        let map = world.map
+        var i = 0
+        while i + 0x187 < map.count {
+            let stage = map[i] & 0x30
+            if stage == 0x30 { harkonnen += 1 } else if stage != 0 { atreides += 1 }
+            i += 1
+            cells += 1
         }
-
-        // The DOS results callback slides the FRESK decorations apart and
-        // paints these command strings over the live area-control view. Keep
-        // the same source strings and layout while the full gauge animation
-        // is still being ported.
-        Primitives.fillRect(DuneRect(0, 0, 319, 152), 241, buffer, isOffset: false)
-        freskSprite.drawFrame(0, x: 0, y: 0, buffer: buffer)
-        freskSprite.drawFrame(1, x: 214, y: 0, buffer: buffer)
-
-        font.paletteIndex = 250
-        font.render(GameText.shared.command(181), rect: DuneRect(72, 4, 176, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(182), rect: DuneRect(72, 18, 176, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(185), rect: DuneRect(48, 39, 224, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(186), rect: DuneRect(58, 53, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(187), rect: DuneRect(166, 53, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(188), rect: DuneRect(48, 72, 224, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(189), rect: DuneRect(58, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(190), rect: DuneRect(166, 86, 96, 12), buffer: buffer, alignment: .center, style: .small)
-        font.render(GameText.shared.command(191), rect: DuneRect(48, 105, 224, 12), buffer: buffer, alignment: .center, style: .small)
-
-        // Keep the source command strings above, but expose the live state
-        // that the original results screen is driven by. This is intentionally
-        // raw: the location table and spice bytes are decoded, while troop
-        // population is not yet available from the save record.
-        font.paletteIndex = 250
-        let state = GameState.shared
-        font.render("DAY \(state.day) \(state.phase.title)",
-                    rect: DuneRect(10, 2, 56, 10), buffer: buffer,
-                    alignment: .left, style: .small)
-        font.render("LOC \(state.currentLocation) SPICE \(state.spiceDensity)",
-                    rect: DuneRect(10, 16, 110, 10), buffer: buffer,
-                    alignment: .left, style: .small)
-        font.render("ORDER \(state.troopOrder.title)",
-                    rect: DuneRect(10, 30, 110, 10), buffer: buffer,
-                    alignment: .left, style: .small)
-        font.render("ROLE \(state.troopOccupation.title)",
-                    rect: DuneRect(10, 58, 110, 10), buffer: buffer,
-                    alignment: .left, style: .small)
-        font.render(state.milestone.rawValue,
-                    rect: DuneRect(10, 44, 110, 10), buffer: buffer,
-                    alignment: .left, style: .small)
-
+        let areaH = cells > 0 ? (harkonnen * 100 + cells / 2) / cells : 0
+        let areaA = cells > 0 ? (atreides * 100 + cells / 2) / cells + 1 : 0
+        // Men (bytes = men / 10): the Harkonnen troops, the hired ones not captured.
+        var menH = 0, menA = 0
+        for id in 1...World.troopCount {
+            let o = World.troopTable + World.troopSize * (id - 1)
+            guard world.b(o) != 0 else { continue }
+            let t = world.troop(id)
+            if t.harkonnen { menH += Int(t.men) } else if t.occupation & 0xA0 == 0 { menA += Int(t.men) }
+        }
+        let spiceH = Int(world.w(0xA8)), spiceA = Int(world.w(0xA6))
+        let day = Int(world.w(World.gameTime)) / 16 + 1
+        let suffix = day % 10 == 1 && day % 100 != 11 ? "st" : day % 10 == 2 && day % 100 != 12 ? "nd"
+            : day % 10 == 3 && day % 100 != 13 ? "rd" : "th"
+        func label(_ text: String) -> String {
+            GameText.shared.findCommand(text).map { GameText.shared.command($0).trimmingCharacters(in: .whitespaces) } ?? text
+        }
+        let harkonnenColour: UInt8 = 0x3F, atreidesColour: UInt8 = 0x25, title: UInt8 = 0xFD, caption: UInt8 = 0xFB
+        let texts: [(Int, Int, UInt8, String)] = [
+            (16, 6, title, "\(day)\(suffix) day on DUNE"),
+            (216, 6, title, "CHARISMA = \(world.b(0x29))"),
+            (20, 69, harkonnenColour, String(format: "%3d%%", areaH)),
+            (48, 69, atreidesColour, String(format: "%3d%%", areaA)),
+            (8, 80, caption, label("CONTROLLED AREAS")),
+            (240, 60, harkonnenColour, String(format: "%5d0", spiceH)),
+            (272, 60, atreidesColour, String(format: "%5d0", spiceA)),
+            (236, 71, caption, label("SPICE PRODUCTION")),
+            (240, 131, harkonnenColour, String(format: "%5d0", menH)),
+            (272, 131, atreidesColour, String(format: "%5d0", menA)),
+            (236, 142, caption, label("NUMBER OF MEN")),
+            (35, 125, atreidesColour, label("ATREIDES")),
+            (35, 139, harkonnenColour, label("HARKONNEN")), // the original shows it without the S
+        ]
+        for (x, y, colour, text) in texts {
+            font.paletteIndex = colour
+            font.renderLine(text, x: x, y: y, buffer: buffer, style: .small)
+        }
+        let anchors = [(26, 62), (54, 62), (252, 54), (280, 54), (252, 125), (280, 125)]
+        let targets = [areaH / 2 + 1, areaA / 2 + 1, (spiceH >> 4) + 1, (spiceA >> 4) + 1, (menH >> 8) + 1, (menA >> 8) + 1]
+        for g in 0..<6 {
+            let height = min(targets[g], 30)
+            for v in stride(from: 1, through: height, by: 1) {
+                icons.drawFrame(g & 1 != 0 ? 0x38 : 0x37, x: Int16(anchors[g].0), y: Int16(anchors[g].1 - v), buffer: buffer)
+            }
+            icons.drawFrame(0x39, x: Int16(anchors[g].0), y: Int16(anchors[g].1 - height - 10), buffer: buffer)
+        }
     }
 
 
@@ -369,7 +401,10 @@ final class Fresk: DuneNode {
         case .globe, .results:
             switch index {
             case 0: return .exitGlobe
-            case 1: return show(menuMode == .globe ? .results : .globe)
+            case 1:
+                // SEE RESULTS / STANDARD VISION: the panels slide (0.8 s).
+                resultsTarget = menuMode == .globe ? 100 : 0
+                return show(menuMode == .globe ? .results : .globe)
             case 2: return show(.save)
             case 3: return show(.load)
             case 4: return show(.options)
