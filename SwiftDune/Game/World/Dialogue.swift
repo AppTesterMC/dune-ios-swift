@@ -194,8 +194,11 @@ final class Conversation {
         self.mask = mask
         self.oneList = oneList
         self.single = single
-        // sub_193DF: met, and the one Paul talks to.
         let world = story.world
+        // Floppy CS:9EF5 clears the spoken-line flag (ds:19) for a normal
+        // conversation; verb, contact and phase-trigger scans bypass it.
+        if !oneList { world.setB(0x19, 0) }
+        // sub_193DF: met, and the one Paul talks to.
         let bit: UInt16 = character < 16 ? UInt16(1) << UInt16(character) : 0
         world.setW(0x0E, world.w(0x0E) | bit)
         world.setW(0x14, bit)
@@ -271,6 +274,9 @@ final class Conversation {
         guard let entry = current else { return }
         let wasSaid = entry.said
         applyAction(entry, wasSaid: wasSaid)
+        // Floppy CS:A8B3: a line was spoken; first-line-only fallbacks
+        // (conditions on ds:19 == 0) are off for the rest of the talk.
+        story.world.setB(0x19, 0xFF)
         story.dialogue.markSaid(entry.offset)
         if entry.topic != 0 && !wasSaid {
             story.notebook.append(UInt16(character << 11 | entry.offset / 4))

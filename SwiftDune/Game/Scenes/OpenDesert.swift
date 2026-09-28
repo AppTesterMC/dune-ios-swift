@@ -13,6 +13,9 @@ import Foundation
 
 final class OpenDesert: DuneNode {
     private var sky: Sky?
+    private var landscape: DesertLandscape?
+    /// Paul's position: longitude, latitude and the fine (a 256th of a row).
+    private var position: (longitude: UInt16, latitude: Int, fine: Int)?
 
     init() {
         super.init("OpenDesert")
@@ -20,17 +23,38 @@ final class OpenDesert: DuneNode {
 
     override func onEnable() {
         sky = Sky()
+        landscape = World.shared.isFloppy ? DesertLandscape() : nil
     }
 
     override func onDisable() {
         sky = nil
+        landscape = nil
     }
 
+    /// Params: "longitude", "latitude", "fine".
+    override func onParamsChange() {
+        if let lng = params["longitude"] as? UInt16, let lat = params["latitude"] as? Int {
+            position = (lng, lat, params["fine"] as? Int ?? 0)
+        }
+    }
+
+    /// draw_room_scene's desert case (floppy 3AA7): the sky (the large one
+    /// at longitudes 0x2001 and 0x3001, the original's quirk), the sand from
+    /// y 77, the landscape (ScummVM drawWalkView).
     override func render(_ buffer: PixelBuffer) {
         guard let sky = sky else { return }
         sky.lightMode = GameState.shared.phase.lightMode
-        sky.render(buffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
-        Primitives.fillRect(DuneRect(0, 78, 320, 74), 190, buffer, isOffset: false)
+        guard let landscape = landscape, let p = position else {
+            sky.render(buffer, width: 320, at: 0, type: .narrow, gameplayPalette: true)
+            Primitives.fillRect(DuneRect(0, 78, 320, 74), 190, buffer, isOffset: false)
+            return
+        }
+        let tall = p.longitude == 0x2001 || p.longitude == 0x3001
+        sky.render(buffer, width: 320, at: 0, type: tall ? .large : .narrow, gameplayPalette: true)
+        Primitives.fillRect(DuneRect(0, Int16(DesertLandscape.horizon), 320, UInt8(152 - DesertLandscape.horizon)),
+                            DesertLandscape.groundColour, buffer, isOffset: false)
+        landscape.setPalette()
+        landscape.draw(buffer, longitude: p.longitude, latitude: p.latitude, fine: p.fine, key: p.longitude)
     }
 }
 

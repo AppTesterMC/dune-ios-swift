@@ -204,10 +204,14 @@ final class Game: DuneNode {
     }
 
     /// Shows wherever the data segment says Paul is (new game or a load).
+    /// The floppy's own Sietch node (SIET0/SIET1) instead of the generic
+    /// room view; off: sietches are drawn like every place (SIET.SAL).
+    static let floppySietchNode = ProcessInfo.processInfo.environment["DUNE_SIETCH_NODE"] == "1"
+
     func showCurrentPlace() {
         // The floppy's Sietch node draws SIET0/SIET1; the CD has no SIET0,
         // so its sietches use the generic room view (Palace node, SIET.SAL).
-        if world.isFloppy && world.placeType <= Location.sietchMax && world.currentRoomRecord() != nil {
+        if Game.floppySietchNode && world.isFloppy && world.placeType <= Location.sietchMax && world.currentRoomRecord() != nil {
             if findNode("Sietch") == nil {
                 attachNode(Sietch())
             }
@@ -500,6 +504,7 @@ final class Game: DuneNode {
             world.setRoom(1)
         }
         inDesert = false
+        walking = false
     }
 
     /// GO THERE FLYING AN ORNI to a desert point.
@@ -575,6 +580,60 @@ final class Game: DuneNode {
     /// Where Paul stands in the open desert (not in the segment's layout;
     /// the flight's point).
     private var desertPosition: (latitude: Int, longitude: UInt16)?
+    /// Walked out of a place (no ornithopter beside Paul).
+    private var walking = false
+    /// On foot: a 256th of a map row (desert_apply_step_delta).
+    private var walkFine = 0
+
+    /// ui_click_move_room's walk out (floppy 422C, exits 0xFB-0xFF): Paul
+    /// leaves the place on foot into the open desert around it.
+    private func walkOut(_ exit: UInt8) {
+        let l = world.location(world.currentLocation)
+        engine.logger.log(.info, "Desert: Paul walks out of place \(world.currentLocation)")
+        walking = true
+        walkFine = 0
+        landInDesert((Int(l.latitude), l.longitude))
+        // The first step out: 0xFF up .. 0xFC left is north, east, south, west.
+        desertStep(Int(0 &- exit))
+    }
+
+    /// desert_apply_step_delta (floppy B4CC): 1 north, 2 east, 3 south,
+    /// 4 west; a 256th of a row north or south, one longitude unit east or
+    /// west. Back on a place's own cell and longitude: room 1 (floppy 4279).
+    private func desertStep(_ direction: Int) {
+        guard var p = desertPosition else { return }
+        switch direction {
+        case 1:
+            if walkFine == 0 {
+                if p.latitude - 1 > -0x62 { p.latitude -= 1; walkFine = 0xFF }
+            } else { walkFine -= 1 }
+        case 3:
+            if walkFine == 0xFF {
+                if p.latitude + 1 < 0x62 { p.latitude += 1; walkFine = 0 }
+            } else { walkFine += 1 }
+        case 2: p.longitude = p.longitude &+ 1
+        case 4: p.longitude = p.longitude &- 1
+        default: break
+        }
+        desertPosition = p
+        if walkFine == 0, let cell = world.mapCell(longitude: p.longitude, latitude: p.latitude),
+           cell < world.map.count, world.map[cell] & 0x40 != 0,
+           let place = (0..<world.locationCount).first(where: {
+               let l = world.location($0)
+               return world.mapCell(longitude: l.longitude, latitude: Int(l.latitude)) == cell && l.longitude == p.longitude
+           }) {
+            engine.logger.log(.info, "Desert: Paul walks back into place \(place)")
+            walking = false
+            inDesert = false
+            desertPosition = nil
+            setNodeActive("OpenDesert", false)
+            world.setPosition(location: place, room: 1)
+            gameState.setLocation(place)
+            showCurrentPlace()
+            return
+        }
+        showDesert()
+    }
 
     private func landInDesert(_ point: (latitude: Int, longitude: UInt16)) {
         inDesert = true
@@ -599,7 +658,8 @@ final class Game: DuneNode {
         add(.map, "SEE DUNE MAP")
         add(.worm, "CALL A WORM", !world.canCallWorm)
         add(.wait, world.hour < 11 ? "WAIT FOR EVENING" : "WAIT FOR MORNING")
-        add(.ornithopter, "TAKE AN ORNITHOPTER")
+        // On foot (walked out of a place) there is no ornithopter to take.
+        if !walking { add(.ornithopter, "TAKE AN ORNITHOPTER") }
         return rows
     }
 
@@ -608,9 +668,12 @@ final class Game: DuneNode {
         setNodeActive("Palace", false)
         setNodeActive("Sietch", false)
         setNodeActive("OpenDesert", true, .background)
+        if let p = desertPosition {
+            findNode("OpenDesert")?.params = ["longitude": p.longitude, "latitude": p.latitude, "fine": walking ? walkFine : 0]
+        }
         let rows = desertRows()
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
-            leftPanel: .bookClosed, rightPanel: .roomDirections, items: rows.map { $0.id }, directions: [],
+            leftPanel: .bookClosed, rightPanel: .roomDirections, items: rows.map { $0.id }, directions: walking ? .all : [],
             day: gameState.day, phase: gameState.phase, greyed: rows.map { $0.greyed }))
     }
 
@@ -1006,8 +1069,14 @@ final class Game: DuneNode {
         } else if world.placeType == Location.palace && world.room == 9, let mirror = lookAtMirrorRow {
             items.append(mirror)
         }
-        for person in world.peopleInRoom() where person <= World.harah {
-            items.append(UInt16(109 + person))
+        for person in world.peopleInRoom() {
+            if person <= World.harah {
+                items.append(UInt16(109 + person))
+            } else if person == World.fremen {
+                items.append(123) // Fremen (a troop not hired yet)
+            } else if person >= World.fremenChief {
+                items.append(UInt16(124 + person - World.fremenChief)) // Fremen Chief, 2nd ..., 8th
+            }
         }
         return Array(items.prefix(5))
     }
@@ -1927,6 +1996,11 @@ final class Game: DuneNode {
             handleDesertRow(Int((event.point.y - menuRect.y) / 8))
             return
         }
+        if inDesert && walking && !mapActive && flight == nil && !isOverlayActive("Dialogue") && !isOverlayActive("Fresk")
+            && !isOverlayActive("Book"), let direction = panelDirection(at: event.point) {
+            desertStep(direction.rawValue + 1)
+            return
+        }
         // In a room talk the verbs stay under the line: a click on them picks one.
         if isOverlayActive("Dialogue") && !(inRoomTalk && event.point.y >= 152) {
             // A click on the view: the next line; after the last one (or a
@@ -2318,6 +2392,10 @@ final class Game: DuneNode {
         dialogueCharacter = nil
         guard let exits = world.currentRoomRecord()?.exits else { return }
         engine.logger.log(.info, "Room: move \(direction) from room \(world.room) -> exit \(exits[direction.rawValue])")
+        if exits[direction.rawValue] >= 0xFB {
+            walkOut(exits[direction.rawValue])
+            return
+        }
 
         switch RoomRecord.decode(exits[direction.rawValue]) {
         case .room(let room):
