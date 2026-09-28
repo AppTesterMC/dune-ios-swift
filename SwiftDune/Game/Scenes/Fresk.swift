@@ -232,6 +232,11 @@ final class Fresk: DuneNode {
         let slide = Int16(resultsOpen * 112 / 100)
         freskSprite.drawFrame(0, x: -slide, y: 0, buffer: buffer)
         freskSprite.drawFrame(1, x: 214 + slide, y: 0, buffer: buffer)
+        // Paul's arrow (ICONES 0x36 at (x, y - 16)) where he is on the globe.
+        let here = World.shared.location(World.shared.currentLocation)
+        if let icons = iconSprite, let p = globe.project(longitude: here.longitude, latitude: Int(here.latitude)) {
+            icons.drawFrame(0x36, x: Int16(p.x), y: Int16(p.y - 16), buffer: buffer)
+        }
         if resultsOpen >= 100 { renderResults(buffer) }
     }
 
@@ -337,6 +342,10 @@ final class Fresk: DuneNode {
             font.paletteIndex = colour
             font.renderLine(text, x: x, y: y, buffer: buffer, style: .small)
         }
+        // The legend's emblems, FRESK 3 (the hawk) and 4 (the ram), found
+        // in the original's results screen (explore-09).
+        freskSprite?.drawFrame(3, x: 11, y: 124, buffer: buffer)
+        freskSprite?.drawFrame(4, x: 11, y: 136, buffer: buffer)
         let anchors = [(26, 62), (54, 62), (252, 54), (280, 54), (252, 125), (280, 125)]
         let targets = [areaH / 2 + 1, areaA / 2 + 1, (spiceH >> 4) + 1, (spiceA >> 4) + 1, (menH >> 8) + 1, (menA >> 8) + 1]
         for g in 0..<6 {

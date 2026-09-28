@@ -391,6 +391,81 @@ final class Globe {
     }
     
     
+    /// Floppy CS:B9F1-BB0A (the ScummVM port's projectGlobePlayer): the
+    /// globe lookup inverted for one position, nil when it is on the far
+    /// side. The screen point is the sphere's (centre 160,79).
+    func project(longitude: UInt16, latitude: Int) -> (x: Int, y: Int)? {
+        let tableStart = 3290
+        let latitudeRow = abs(latitude)
+        guard latitudeRow < 99, globData.count >= tableStart + 64 * 200, tablat.count >= 99 * 8 else { return nil }
+        let rotationIndex = Int((398 * UInt32(rotation)) >> 16)
+        let tiltValue = -Int(tilt) // the port's tilt; this renderer's runs the other way
+        let half = Int(tablat[latitudeRow * 8 + 2]) << 8 | Int(tablat[latitudeRow * 8 + 3])
+        let unit = ((UInt32(rotationIndex) << 16) + 0x8000) / 398
+        let rowRotation = latitudeRow == 0 ? rotationIndex : Int((2 * UInt64(unit) * UInt64(half)) >> 16)
+        var delta = Int((UInt32(2 * half) * UInt32(longitude) + 0x8000) >> 16) - rowRotation
+        var negative = delta < 0
+        delta = abs(delta)
+        if delta >= half {
+            delta = 2 * half - delta
+            negative.toggle()
+        }
+        let far = delta >= half / 2
+        if far { delta = 2 * (half / 2) - delta }
+        // BA55..BA7F: the 64 column blocks, keeping the latitude found.
+        var offset = tableStart, remaining = 100, column = 0, previousRemaining = 100
+        var selected = false
+        while offset < tableStart + 64 * 200 {
+            var found = false
+            while remaining > 0 {
+                let v = Int(globData[offset]); offset += 1
+                remaining -= 1
+                if v == latitudeRow * 2 { found = true; break }
+            }
+            if !found {
+                remaining = previousRemaining
+                selected = true
+                break
+            }
+            remaining += 1
+            if delta <= Int(globData[offset + 99]) { selected = true; break }
+            previousRemaining = remaining
+            column += 1
+            offset += 199
+        }
+        guard selected else { return nil }
+        var lookup = UInt16(100 - remaining)
+        if far { lookup = UInt16(UInt8(truncatingIfNeeded: -Int(lookup))) }
+        if latitude < 0 { lookup |= 0xFF00 }
+        // BA8F..BAAD: the tilt table searched backwards.
+        func tiltEntry(_ index: Int) -> UInt16 {
+            let n = tiltValue + 98 - index
+            if n > 98 { return UInt16(UInt8(truncatingIfNeeded: n - 197)) }
+            if n >= 0 { return UInt16(n) }
+            if n >= -98 { return 0xFF00 | UInt16(-n) }
+            return 0xFF00 | UInt16(UInt8(truncatingIfNeeded: -197 - n))
+        }
+        guard let tableIndex = (34..<162).first(where: { tiltEntry($0) == lookup }) else { return nil }
+        let vertical = tableIndex - 98
+        let south = vertical < 0
+        let target = abs(vertical)
+        // BAAF..BAE3: the outline row whose sample is closest (error <= 2).
+        var stream = 0, best = 255, bestRow = 0
+        for row in 0..<54 {
+            let width = Int(~globData[stream] & 0xFF); stream += 1
+            if width == 0 || width <= column { break }
+            let difference = Int(UInt8(truncatingIfNeeded: Int(globData[stream + column]) - target))
+            stream += width
+            if difference < best {
+                best = difference
+                bestRow = row
+                if difference == 0 { break }
+            }
+        }
+        guard best <= 2 else { return nil }
+        return (160 + (negative ? -column : column), 79 + (south ? bestRow : -bestRow))
+    }
+
     public func render(buffer: PixelBuffer) {
         self.precalculateGlobeRotationLookupTable(rotation)
         
