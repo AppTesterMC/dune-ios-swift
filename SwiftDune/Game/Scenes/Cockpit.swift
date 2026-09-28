@@ -67,11 +67,41 @@ struct MapWindow {
 
     /// A position's pixel in the window, nil outside it.
     func project(longitude lng: UInt16, latitude lat: Int) -> (x: Int, y: Int)? {
+        guard let p = position(longitude: lng, latitude: lat), contains(p.x, p.y) else { return nil }
+        return p
+    }
+
+    /// A position's pixel, also outside the window (sub_D414; nil only
+    /// without a map row).
+    func position(longitude lng: UInt16, latitude lat: Int) -> (x: Int, y: Int)? {
         guard let r = row(lat) else { return nil }
         var d = MapWindow.column(lng, r.cells) - MapWindow.column(longitude, r.cells)
         if d > r.cells / 2 { d -= r.cells } else if d < -r.cells / 2 { d += r.cells }
-        let px = x + width / 2 + d, py = y + lat - top
-        return contains(px, py) ? (px, py) : nil
+        return (x + width / 2 + d, y + lat - top)
+    }
+
+    /// A troop's route (sub_AD0A): each point projected, then a line per
+    /// pair in colour 0x0C, the pattern 0x5555 rotated left before each
+    /// pixel and restarted per segment, clipped to the window.
+    func drawRoute(_ buffer: PixelBuffer, _ points: [(longitude: UInt16, latitude: Int)]) {
+        let screen = points.compactMap { position(longitude: $0.longitude, latitude: $0.latitude) }
+        guard screen.count > 1 else { return }
+        let raw = buffer.rawPointer
+        for i in 1..<screen.count {
+            var x0 = screen[i - 1].x, y0 = screen[i - 1].y
+            let x1 = screen[i].x, y1 = screen[i].y
+            let dx = abs(x1 - x0), dy = abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1
+            var err = dx - dy
+            var pattern: UInt16 = 0x5555
+            while true {
+                pattern = pattern << 1 | pattern >> 15
+                if pattern & 1 != 0 && contains(x0, y0) && y0 < buffer.height { raw[y0 * buffer.width + x0] = 0x0C }
+                if x0 == x1 && y0 == y1 { break }
+                let e2 = 2 * err
+                if e2 > -dy { err -= dy; x0 += sx }
+                if e2 < dx { err += dx; y0 += sy }
+            }
+        }
     }
 
     /// The map position under a window pixel.

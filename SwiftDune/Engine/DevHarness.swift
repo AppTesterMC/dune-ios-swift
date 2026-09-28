@@ -14,7 +14,7 @@
 //    DUNE_PHASE=<hex>         start a new game at this story phase (ds:2A)
 //    DUNE_MUTE=1              no sound (scripts/sim_run.sh sets it)
 //  Script actions handled by the game: place:<index>, point:<lat>,<lng>,
-//  scene:<hex CD offset>
+//  scene:<hex CD offset>, troop:<id> (its contact popup over the map)
 //    DUNE_SCRIPT=<steps>      ';'-separated "<seconds>:<action>[:<arg>]"
 //        key:<esc|ret|del|left|right|up|down|c>   press a key (c = one char)
 //        click:<x>,<y>                           click at a game pixel

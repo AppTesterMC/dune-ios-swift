@@ -32,7 +32,6 @@ final class Game: DuneNode {
         case comm
         case palace
         case sietch
-        case troop
         case shipment
     }
     private let menuRect = DuneRect(92, 159, 136, 40)
@@ -77,8 +76,6 @@ final class Game: DuneNode {
     private var palacePlan = false
     /// CALL A WORM chose the map: the next trip rides a worm (no ornithopter).
     private var riding = false
-    /// MOVE TROOP chose the map: the destination is the troop's (map "Done").
-    private var movingTroop: Int?
     /// How long Paul has waited in a room or the desert with nothing open
     /// (idle_room_message_check, seg000:2b2a); input resets it.
     private var idleTime: TimeInterval = 0
@@ -141,6 +138,13 @@ final class Game: DuneNode {
           guard let self = self, self.mapActive, parts.count == 2 else { return }
           self.flatMap.choosePoint(latitude: parts[0], longitude: UInt16(truncatingIfNeeded: parts[1]))
           self.publishMapUI()
+      }
+      DevHarness.shared.handlers["troop"] = { [weak self] argument in
+          // The troop's contact popup over the map, as GIVE ORDERS TO TROOP opens it.
+          guard let self = self, let id = Int(argument), self.world.troopExists(id) else { return }
+          if !self.mapActive { self.openMap(select: false, caption: false) }
+          if let place = self.world.troopPlace(id) { self.flatMap.centreOn(place) }
+          self.openTroopContact(id)
       }
       DevHarness.shared.handlers["place"] = { [weak self] argument in
           guard let self = self, self.mapActive, let index = Int(argument) else { return }
@@ -266,18 +270,18 @@ final class Game: DuneNode {
     private func closeMapForLoad() {
         guard mapActive else { return }
         mapActive = false
-        movingTroop = nil
+        endTroopContact()
         setNodeActive("FlatMap", false)
     }
 
     private func closeMap() {
         mapActive = false
-        movingTroop = nil
+        endTroopContact()
         setNodeActive("FlatMap", false)
         if inDesert { showDesert() } else { showCurrentPlace() }
     }
 
-    private enum MapRow { case exit, fly, worm, moveDone, orders, contact, density, takeOrnithopter, prospectors }
+    private enum MapRow { case exit, fly, worm, orders, contact, density, takeOrnithopter, prospectors }
 
     /// map_setup_main_menu (seg000:878c): EXIT MAPS; GO THERE FLYING AN
     /// ORNI once a place is chosen; GIVE ORDERS TO TROOP within a contact
@@ -294,10 +298,6 @@ final class Game: DuneNode {
         let map = flatMap
         let phase = world.b(World.phase)
         add(.exit, "EXIT MAPS")
-        if let _ = movingTroop {
-            if map.destination != nil { add(.moveDone, "  Done") }
-            return rows
-        }
         if map.selecting, (map.destination.map { $0 != world.currentLocation || inDesert } ?? false) || map.point != nil {
             add(.fly, riding ? "GO THERE RIDING A WORM" : "GO THERE FLYING AN ORNI")
         } else if !map.selecting, let destination = map.destination, destination != world.currentLocation,
@@ -322,6 +322,10 @@ final class Game: DuneNode {
     }
 
     private func publishMapUI() {
+        if troopContact != nil {
+            publishTroopContactUI()
+            return
+        }
         let rows = mapRows()
         EventManager.uiStateChangedEvent.notify(UIStateEventData(
             leftPanel: .map,
@@ -336,6 +340,10 @@ final class Game: DuneNode {
 
     private func handleMapClick(_ point: DunePoint) {
         let map = flatMap
+        if troopContact != nil {
+            handleTroopContactClick(point)
+            return
+        }
         // The globe in the map's left panel: the game menu (as in the original).
         if point.x < 80 && point.y >= 152 {
             showFresk()
@@ -349,7 +357,9 @@ final class Game: DuneNode {
             }
             return
         }
-        if map.density && point.x >= 75 && point.x < 85 && point.y >= 15 && point.y < 25 {
+        let box = map.densityOrigin
+        let px = Int(point.x), py = Int(point.y)
+        if map.density && px >= box.x && px < box.x + 10 && py >= box.y && py < box.y + 10 {
             // The SPICE DENSITY panel's close box (ONMAP 0x8D's corner).
             map.density = false
             publishMapUI()
@@ -382,22 +392,24 @@ final class Game: DuneNode {
                 riding = true
                 fly(to: destination)
             }
-        case .moveDone:
-            if let troop = movingTroop, let destination = map.destination {
-                let accepted = world.issueMoveOrder(troop: troop, to: destination)
-                engine.logger.log(.info, "Troops: troop \(troop) \(accepted ? "moves" : "refuses to move") to \(destination)")
-                movingTroop = nil
-                closeMap()
-            }
         case .prospectors:
-            // Centre on the prospectors (troop 3); their contact popup is
-            // not ported yet.
-            if let place = world.troopPlace(3) {
-                map.choose(place)
-                publishMapUI()
+            findProspectors()
+        case .orders:
+            // The selected place's hired troop, or the one where Paul is.
+            let at = map.destination ?? world.currentLocation
+            if let id = world.troopsAt(at).first(where: { !$0.harkonnen && $0.hired })?.id {
+                openTroopContact(id)
+            } else {
+                engine.logger.log(.info, "Troops: no troops at place \(at)")
             }
-        case .orders, .contact:
-            break // the troop contact popup is not ported yet
+        case .contact:
+            // seg000:86cc: the next rallied troop after the last one
+            // contacted; the map centres on it and its popup opens.
+            if let id = nextRalliedTroop(after: lastContacted) {
+                lastContacted = id
+                if let place = world.troopPlace(id) { map.centreOn(place) }
+                openTroopContact(id)
+            }
         }
     }
 
@@ -1233,7 +1245,7 @@ final class Game: DuneNode {
         lastDialogueCharacter = character
         dialogueCharacter = character
         dialoguePhraseOverride = nil
-        dialogueMenuItems = context == .troop ? [66, 68, 67, 69, 72] : talkRows(character)
+        dialogueMenuItems = talkRows(character)
         showRoomOrSietch()
         publishDialogueUI()
     }
@@ -1372,10 +1384,6 @@ final class Game: DuneNode {
 
     // MARK: - Troops
 
-    private enum TroopMenu { case orders, occupation }
-    private var troopMenu: TroopMenu = .orders
-    private var troopRows: [(job: UInt8?, id: UInt16)] = []
-
     /// WORK FOR ME (seg000:95c1): the charisma check, the Fremen's list-5
     /// answer; a pass rallies the troop and the talk goes on with its chief.
     private func workForMe() {
@@ -1398,87 +1406,469 @@ final class Game: DuneNode {
         publishDialogueUI()
     }
 
-    /// GIVE ORDERS TO TROOP: the contact verbs that are ported.
-    private func openTroopOrders() {
-        guard let troop = world.localTroop(hired: true) else { return }
-        dialogueContext = .troop
-        troopMenu = .orders
-        let job = world.troopByte(troop, 3) & 0x0F
-        let text = GameText.shared
-        troopRows = []
-        // The floppy has only CHANGE TROOP OCCUPATION (COMMAND 68).
-        if let row = (job == TroopJob.waitingForOrders ? text.findCommand("SELECT TROOP OCCUPATION") : nil)
-            ?? text.findCommand("CHANGE TROOP OCCUPATION") {
-            troopRows.append((nil, UInt16(row)))
-        }
-        if let row = text.findCommand("MOVE TROOP") { troopRows.append((0xFD, UInt16(row))) }
-        if let row = text.findCommand("NO MORE ORDERS") { troopRows.append((0xFF, UInt16(row))) }
-        dialogueMenuItems = troopRows.map { $0.id }
-        publishDialogueUI()
+    // MARK: - The troop contact popup
+
+    /// The popup's rows (the ScummVM port's kRow* actions).
+    private enum TroopRow {
+        case askMore, occupation, equipment, move, done
+        case setJob(UInt8), espionage, attack, cancelChoice
+        case pickAdd, pickNew, pickDone, pickCancel
+        case continueScene
     }
 
-    /// The occupation rows (seg000:6a71): a waiting troop takes a
-    /// speciality; a spice troop mines or prospects; ecology needs Kynes met.
-    private func openOccupationMenu(_ troop: Int) {
-        troopMenu = .occupation
-        let job = world.troopByte(troop, 3) & 0x0F
-        let kynesMet = world.b(0x0A) & 0x20 != 0
-        let text = GameText.shared
-        var rows: [(UInt8?, String)] = []
-        // ECOLOGY is greyed until Kynes is met (ds:0A bit 5, seg000:69b3).
-        let ecology: UInt8? = kynesMet ? TroopJob.irrigation : 0xFE
-        if job == TroopJob.waitingForOrders {
-            rows = [(TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (TroopJob.militaryTraining, "SPECIALIZE IN ARMY"),
-                    (ecology, "SPECIALIZE IN ECOLOGY")]
-        } else if job & 0x0C == 0 {
-            rows = [(TroopJob.spiceMining, "Spice Mining"), (TroopJob.prospecting, "Spice Prospection")]
-        } else if job == TroopJob.espionage {
-            rows = [(0xFC, "ATTACK")]
-        } else if job & 0x0C == 4 {
-            // ESPIONAGE greyed without a hidden fort in reach (seg000:69b3).
-            rows = [(world.canStartEspionage(troop: troop) ? 0xFB : 0xFE, "ESPIONAGE"),
-                    (TroopJob.spiceMining, "SPECIALIZE IN SPICE"), (ecology, "SPECIALIZE IN ECOLOGY")]
+    /// The troop contact popup over the flat map (the ScummVM port's
+    /// kTroop mode): whose it is, the chief's line, the occupation menu,
+    /// the MOVE TROOP pick with the prospectors' working queue (ds:4274,
+    /// its count ds:4294) and the prospector lesson's scene.
+    private struct TroopContact {
+        let id: Int
+        /// GIVE ORDERS TO TROOP from the sietch chief: NO MORE ORDERS goes back to the room.
+        var fromRoom = false
+        var line = ""
+        var choosing = false
+        var picking = false
+        var pickQueue: [UInt16] = [0, 0, 0]
+        var pickCount = 0
+        var lineBefore = ""
+        var scene: [UInt8] = []
+        var sceneCursor = 0
+    }
+    private var troopContact: TroopContact?
+    /// The chief's contact lines (character 15, list 2).
+    private var troopTalk: Conversation?
+    private var troopRows: [(row: TroopRow, id: UInt16, greyed: Bool)] = []
+    /// CONTACT FREMEN TROOPS goes round the rallied troops from here.
+    private var lastContacted = 0
+    /// The prospectors' third pick commits after a beat (sub_FD63(0x32)).
+    private var pickCommitAt: TimeInterval?
+
+    /// map_setup_troop_contact_popup: the chief's contact lines (DIALOGUE
+    /// character 15, list 2) over the troop's staged figures.
+    private func openTroopContact(_ id: Int, fromRoom: Bool = false) {
+        engine.logger.log(.info, "Troops: orders for troop \(id)")
+        world.stageTroopForConditions(id)
+        troopTalk = Conversation(story: story, character: World.fremenChief, list: 2, mask: 0x80, oneList: true)
+        troopContact = TroopContact(id: id, fromRoom: fromRoom)
+        nextTroopLine()
+        refreshTroopContact()
+    }
+
+    /// ASK FOR MORE INFORMATION: the next line; the list starts over when used up.
+    private func nextTroopLine() {
+        guard var contact = troopContact else { return }
+        var page = troopTalk?.next()
+        if page == nil {
+            world.stageTroopForConditions(contact.id)
+            troopTalk = Conversation(story: story, character: World.fremenChief, list: 2, mask: 0x80, oneList: true)
+            page = troopTalk?.next()
+        }
+        if let page = page { contact.line = page }
+        troopContact = contact
+    }
+
+    /// The popup gone (the map closed or its orders done).
+    private func endTroopContact() {
+        troopContact = nil
+        troopTalk = nil
+        pickCommitAt = nil
+        guard let map = findNode("FlatMap") as? FlatMap else { return }
+        map.troopContact = nil
+        map.density = false
+        map.setDensityForMap()
+    }
+
+    /// NO MORE ORDERS: back to the map's main menu, or to the room the
+    /// chief's GIVE ORDERS TO TROOP came from.
+    private func leaveTroopContact() {
+        let fromRoom = troopContact?.fromRoom ?? false
+        endTroopContact()
+        if fromRoom {
+            closeMap()
         } else {
-            rows = [((job & 0x0C) | 1, "ASSEMBLY WIND-TRAP"), (TroopJob.spiceMining, "SPECIALIZE IN SPICE"),
-                    (TroopJob.militaryTraining, "SPECIALIZE IN ARMY")]
-        }
-        rows.append((0xFF, "Cancel"))
-        troopRows = rows.compactMap { row in text.findCommand(row.1).map { (row.0, UInt16($0)) } }
-        dialogueMenuItems = troopRows.map { $0.id }
-        publishDialogueUI(greyed: troopRows.map { $0.job == 0xFE })
-    }
-
-    private func handleTroopMenu(_ index: Int) {
-        guard index >= 0 && index < troopRows.count, let troop = world.localTroop(hired: true) else { return }
-        let row = troopRows[index]
-        if row.job == 0xFE { return } // greyed
-        switch (troopMenu, row.job) {
-        case (.orders, nil):
-            openOccupationMenu(troop)
-        case (.orders, 0xFD):
-            // MOVE TROOP: choose the place on the map, then "Done".
-            movingTroop = troop
-            dialogueCharacter = nil
-            openMap(select: true, caption: false)
-        case (.occupation, 0xFB):
-            world.startEspionage(troop: troop)
-            openTroopOrders()
-        case (.occupation, 0xFC):
-            if let place = world.troopPlace(troop) { world.startAttack(at: place) }
-            openTroopOrders()
-        case (_, 0xFF):
-            dialogueContext = .sietch
-            dialogueMenuItems = talkRows(dialogueCharacter ?? .fremen2)
-            publishDialogueUI()
-        case (.occupation, let job?):
-            world.setTroopOccupation(troop, job)
-            engine.logger.log(.info, "Troops: troop \(troop) occupation \(job)")
-            openTroopOrders()
-        default:
-            break
+            publishMapUI()
         }
     }
 
+    /// The popup redrawn (drawTroop): over a troop's popup the density
+    /// popup is at (0x5C, 0x1E) with the troop's marker (sub_8F62: its
+    /// place, or its position on the march) and its route (sub_AD0A: from
+    /// its position through its destination, or the prospectors' queue,
+    /// the working copy while picking).
+    private func refreshTroopContact() {
+        guard let contact = troopContact else { return }
+        let id = contact.id
+        let map = flatMap
+        let position = (longitude: world.troopWord(id, 6), latitude: Int(Int16(bitPattern: world.troopWord(id, 8))))
+        var marker = position
+        let place = world.troopPlace(id)
+        func at(_ index: Int) -> (longitude: UInt16, latitude: Int) {
+            let l = world.location(index)
+            return (l.longitude, Int(l.latitude))
+        }
+        if world.troopByte(id, 3) & 0x40 == 0, let place = place { marker = at(place) }
+        var route = [position]
+        if id == World.prospectorTroop {
+            let queue = (0..<3).map { contact.picking ? contact.pickQueue[$0] : world.prospectorDestination($0) }
+            for offset in queue {
+                guard offset != 0 else { break }
+                if let p = world.placeIndex(offset) { route.append(at(p)) }
+            }
+        } else if let place = place {
+            route.append(at(place))
+        }
+        map.setDensityForTroop(x: 0x5C, y: 0x1E, marker: marker, route: route)
+        map.troopContact = (id, contact.line)
+        troopRows = troopContactRows(contact)
+        publishTroopContactUI()
+    }
+
+    /// menu_map_troop_dialog and its sub-menus (drawTroop's rows).
+    private func troopContactRows(_ contact: TroopContact) -> [(row: TroopRow, id: UInt16, greyed: Bool)] {
+        let text = GameText.shared
+        var rows: [(row: TroopRow, id: UInt16, greyed: Bool)] = []
+        func add(_ row: TroopRow, _ caption: String, _ greyed: Bool = false) {
+            if let id = text.findCommand(caption) { rows.append((row, UInt16(id), greyed)) }
+        }
+        let job = world.troopByte(contact.id, 3) & 0x0F
+        if contact.picking {
+            if contact.id == World.prospectorTroop {
+                // menu_map_move_prospectors (sub_AC8D): ADD A DESTINATION
+                // greyed unless the working queue holds one or two places.
+                add(.pickAdd, "ADD A DESTINATION", contact.pickCount < 1 || contact.pickCount > 2)
+                add(.pickNew, "GIVE NEW DESTINATIONS")
+                add(.pickDone, "Done")
+                add(.pickCancel, "Cancel")
+            } else {
+                add(.pickCancel, "Cancel") // menu_multiple_cancel
+            }
+        } else if !contact.scene.isEmpty {
+            // menu_prospector_troop_after_specializing_in_spice.
+            add(.continueScene, " Continue")
+        } else if contact.choosing {
+            // seg000:6a71: a waiting troop takes a speciality; a spice troop
+            // mines or prospects; ECOLOGY is greyed until Kynes is met (ds:0A
+            // bit 5, seg000:69b3); ESPIONAGE without a hidden fort in reach.
+            let kynesMet = world.b(0x0A) & 0x20 != 0
+            if job == TroopJob.waitingForOrders {
+                add(.setJob(TroopJob.spiceMining), "SPECIALIZE IN SPICE")
+                add(.setJob(TroopJob.militaryTraining), "SPECIALIZE IN ARMY")
+                add(.setJob(TroopJob.irrigation), "SPECIALIZE IN ECOLOGY", !kynesMet)
+            } else if job & 0x0C == 0 {
+                add(.setJob(TroopJob.spiceMining), "Spice Mining")
+                add(.setJob(TroopJob.prospecting), "Spice Prospection")
+            } else if job == TroopJob.espionage {
+                add(.attack, "ATTACK")
+            } else if job & 0x0C == 4 {
+                add(.espionage, "ESPIONAGE", !world.canStartEspionage(troop: contact.id))
+                add(.setJob(TroopJob.spiceMining), "SPECIALIZE IN SPICE")
+                add(.setJob(TroopJob.irrigation), "SPECIALIZE IN ECOLOGY", !kynesMet)
+            } else {
+                add(.setJob((job & 0x0C) | 1), "ASSEMBLY WIND-TRAP")
+                add(.setJob(TroopJob.spiceMining), "SPECIALIZE IN SPICE")
+                add(.setJob(TroopJob.militaryTraining), "SPECIALIZE IN ARMY")
+            }
+            add(.cancelChoice, "Cancel")
+        } else {
+            add(.askMore, "ASK FOR MORE INFORMATION")
+            // The floppy has only CHANGE TROOP OCCUPATION.
+            if job == TroopJob.waitingForOrders, text.findCommand("SELECT TROOP OCCUPATION") != nil {
+                add(.occupation, "SELECT TROOP OCCUPATION")
+            } else {
+                add(.occupation, "CHANGE TROOP OCCUPATION")
+            }
+            add(.equipment, "MODIFY EQUIPMENT")
+            add(.move, "MOVE TROOP")
+            add(.done, "NO MORE ORDERS")
+        }
+        return Array(rows.prefix(5))
+    }
+
+    private func publishTroopContactUI() {
+        EventManager.uiStateChangedEvent.notify(UIStateEventData(
+            leftPanel: .map,
+            rightPanel: .mapDirections,
+            items: troopRows.map { $0.id },
+            directions: [],
+            day: gameState.day,
+            phase: gameState.phase,
+            greyed: troopRows.map { $0.greyed }
+        ))
+    }
+
+    private func handleTroopContactClick(_ point: DunePoint) {
+        guard var contact = troopContact, pickCommitAt == nil else { return }
+        if contact.picking && point.y < 152 {
+            troopPickTap(point)
+            return
+        }
+        guard menuRect.contains(point) else { return }
+        let index = Int((point.y - menuRect.y) / 8)
+        guard index >= 0 && index < troopRows.count, !troopRows[index].greyed else { return }
+        engine.logger.log(.info, "Troop command: \(GameText.shared.command(Int(troopRows[index].id)))")
+        switch troopRows[index].row {
+        case .askMore:
+            nextTroopLine()
+        case .occupation:
+            contact.choosing = true
+            troopContact = contact
+        case .cancelChoice:
+            contact.choosing = false
+            troopContact = contact
+        case .equipment:
+            // seg000:7cbb: the equipment panel is not ported yet.
+            engine.logger.log(.info, "Troops: MODIFY EQUIPMENT is not ported yet")
+        case .move:
+            startTroopPick()
+        case .done:
+            leaveTroopContact()
+            return
+        case .setJob(let job):
+            applyTroopOccupation(job)
+        case .espionage:
+            contact.choosing = false
+            troopContact = contact
+            world.startEspionage(troop: contact.id)
+        case .attack:
+            contact.choosing = false
+            troopContact = contact
+            if let place = world.troopPlace(contact.id) { world.startAttack(at: place) }
+        case .pickAdd:
+            return // seg000:8dc7 (floppy): a bare return, the next pick appends
+        case .pickNew:
+            // sub_ACA9 then loc_AE52: the working queue emptied.
+            contact.pickCount = 0
+            contact.pickQueue = [0, 0, 0]
+            troopContact = contact
+        case .pickDone:
+            endTroopPick(.queue)
+            return
+        case .pickCancel:
+            endTroopPick(.cancel)
+            return
+        case .continueScene:
+            troopSceneStep()
+            return
+        }
+        refreshTroopContact()
+    }
+
+    /// troop_apply_occupation_choice (CD 6a89): the job (SPECIALIZE IN
+    /// SPICE makes the prospectors prospect, CD 6a76), then the troop's
+    /// answer, one line of its list 4 with pending_room_action 0x0A (CD
+    /// 7bbe). A line whose event drops the gate refuses and the order is
+    /// taken back. The prospectors' answer (event 3) below phase 0x14 asks
+    /// for scene 0x12F8, the map lesson, run in the popup.
+    private func applyTroopOccupation(_ chosen: UInt8) {
+        guard var contact = troopContact else { return }
+        let id = contact.id
+        let job = chosen == TroopJob.spiceMining && id == World.prospectorTroop ? TroopJob.prospecting : chosen
+        let before = world.troopRecord(id)
+        world.setTroopOccupation(id, job)
+        engine.logger.log(.info, "Troops: troop \(id) occupation \(job)")
+        contact.choosing = false
+        world.stageTroopForConditions(id)
+        world.setB(0x23, 0x0A)
+        let answer = Conversation(story: story, character: World.fremenChief, list: 4, mask: 0x80, oneList: true, single: true)
+        if let page = answer.next() { contact.line = page }
+        answer.finishPending()
+        world.setB(0x23, 0)
+        if answer.gate == 0 {
+            world.setTroopRecord(id, before)
+            engine.logger.log(.info, "Troops: troop \(id) refuses the order")
+        }
+        if story.pendingScene == 0x12F8, let script = story.takePendingScene() {
+            contact.scene = world.sceneScript(script)
+            contact.sceneCursor = 0
+            engine.logger.log(.info, "Scene: troop lesson \(String(script, radix: 16)) starts")
+        }
+        troopContact = contact
+    }
+
+    /// The scripted scene over the troop popup (CD 12F8 on the
+    /// prospectors' SPECIALIZE IN SPICE, bytes 0E 10 FF), one step per
+    /// " Continue...": 0x0E raises the density popup and speaks the next
+    /// line of character 15's list 7 ("Here, take this map of the
+    /// planet."), 0x10 drops it and speaks the next; the end gives the
+    /// orders menu back.
+    private func troopSceneStep() {
+        guard var contact = troopContact else { return }
+        let map = flatMap
+        if contact.sceneCursor >= contact.scene.count || contact.scene[contact.sceneCursor] == 0xFF {
+            contact.scene = []
+            map.density = false
+            troopContact = contact
+            engine.logger.log(.info, "Scene: troop lesson over")
+            refreshTroopContact()
+            return
+        }
+        let op = contact.scene[contact.sceneCursor]
+        contact.sceneCursor += 1
+        if op == 0x0E || op == 0x10 {
+            map.density = op == 0x0E
+            world.stageTroopForConditions(contact.id)
+            let line = Conversation(story: story, character: World.fremenChief, list: 7, mask: 0x80, oneList: true, single: true)
+            if let page = line.next() { contact.line = page }
+            line.finishPending()
+            engine.logger.log(.info, "Scene: troop lesson action \(String(op, radix: 16))")
+        } else {
+            engine.logger.log(.warn, "Scene: troop lesson action \(String(op, radix: 16)) not ported")
+        }
+        troopContact = contact
+        refreshTroopContact()
+    }
+
+    /// MOVE TROOP (seg000:8064, floppy 8d7a): the caption ("Show me where
+    /// you want me to go...", the prospectors the next record, "Show me 3
+    /// sietchs..."; they copy their queue to the working one), the density
+    /// popup, and the pick rows.
+    private func startTroopPick() {
+        guard var contact = troopContact else { return }
+        let text = GameText.shared
+        contact.choosing = false
+        contact.picking = true
+        contact.lineBefore = contact.line
+        contact.pickCount = 0
+        contact.pickQueue = [0, 0, 0]
+        let show = text.findCommand("Show me where")
+        var caption = show.map { text.command($0) } ?? ""
+        if contact.id == World.prospectorTroop {
+            // The count is the first empty slot of the four words (repne scasw), at most 3.
+            for k in 0..<3 {
+                let offset = world.prospectorDestination(k)
+                guard offset != 0 else { break }
+                contact.pickQueue[contact.pickCount] = offset
+                contact.pickCount += 1
+            }
+            if let show = show { caption = text.command(GameText.cdOnly + text.commandIndex(show) + 1) }
+        }
+        contact.line = caption
+        engine.logger.log(.info, "Troops: troop \(contact.id) picks a destination (\"\(caption)\", \(contact.pickCount) queued)")
+        troopContact = contact
+        flatMap.density = true
+    }
+
+    /// mouse_handler_move_troop_pick (seg000:81ec): the nearest marker
+    /// within 9 pixels on the popup's window; move_troop_validate_pick
+    /// (8256): the prospectors take a sietch or an Atreides-held place
+    /// (status bit 3), a fourth pick starts over, the third commits.
+    private func troopPickTap(_ point: DunePoint) {
+        guard var contact = troopContact, let hit = flatMap.densityHit(point) else { return }
+        guard contact.id == World.prospectorTroop else {
+            endTroopPick(.place(hit))
+            return
+        }
+        let l = world.location(hit)
+        guard l.type < 0x20 || l.status & 0x08 != 0 else {
+            engine.logger.log(.info, "Troops: the prospectors cannot prospect place \(hit)")
+            return
+        }
+        if contact.pickCount >= 3 {
+            contact.pickCount = 0
+            contact.pickQueue = [0, 0, 0]
+        }
+        contact.pickQueue[contact.pickCount] = World.placeOffset(hit)
+        contact.pickCount += 1
+        engine.logger.log(.info, "Troops: prospector destination \(contact.pickCount) = place \(hit) (status \(String(l.status, radix: 16)))")
+        troopContact = contact
+        refreshTroopContact()
+        if contact.pickCount == 3 {
+            pickCommitAt = clock + 0.25 // sub_FD63(0x32): a beat before the order
+        }
+    }
+
+    private enum PickEnd { case cancel, place(Int), queue }
+
+    /// The teardown (move_troop_teardown, 82b7), then for a pick the done
+    /// path (seg000:8214): the prospectors store the working queue (an
+    /// empty head cancels); the acknowledgement is one list-4 line with
+    /// ds:23 = 0x0B (0x10 when the troop is already there), spoken with
+    /// the destination staged as the troop's place. A line whose event
+    /// drops the gate starts no march; otherwise troop_issue_move_order
+    /// and the map's main menu.
+    private func endTroopPick(_ end: PickEnd) {
+        guard var contact = troopContact else { return }
+        pickCommitAt = nil
+        contact.picking = false
+        flatMap.density = false
+        var target: Int?
+        switch end {
+        case .cancel:
+            target = nil
+        case .place(let index):
+            target = index
+        case .queue:
+            for k in 0..<3 { world.setProspectorDestination(k, contact.pickQueue[k]) }
+            target = world.placeIndex(contact.pickQueue[0])
+        }
+        guard let dest = target else {
+            contact.line = contact.lineBefore
+            troopContact = contact
+            refreshTroopContact()
+            return
+        }
+        let id = contact.id
+        let before = world.troopWord(id, 4)
+        let same = world.troopPlace(id) == dest
+        if !same { world.setTroopWord(id, 4, World.placeOffset(dest)) }
+        world.stageTroopForConditions(id)
+        world.setTroopWord(id, 4, before)
+        world.setB(0x23, same ? 0x10 : 0x0B)
+        let answer = Conversation(story: story, character: World.fremenChief, list: 4, mask: 0x80, oneList: true, single: true)
+        if let page = answer.next() { contact.line = page }
+        answer.finishPending()
+        world.setB(0x23, 0)
+        troopContact = contact
+        if answer.gate == 0 {
+            // The prospectors keep their queue and leave once this place is prospected.
+            engine.logger.log(.info, "Troops: troop \(id) stays for now (\"\(contact.line)\")")
+            refreshTroopContact()
+            return
+        }
+        if world.issueMoveOrder(troop: id, to: dest) {
+            engine.logger.log(.info, "Troops: troop \(id) answers \"\(contact.line)\" and moves to place \(dest)")
+        }
+        endTroopContact()
+        publishMapUI()
+    }
+
+    /// The next hired Fremen troop after `after`, round the table.
+    private func nextRalliedTroop(after: Int) -> Int? {
+        for step in 1...World.troopCount {
+            let id = (after + step - 1) % World.troopCount + 1
+            guard world.troopExists(id) else { continue }
+            let t = world.troop(id)
+            if !t.harkonnen && t.hired { return id }
+        }
+        return nil
+    }
+
+    /// FIND PROSPECTORS (seg000:5b1e): the map centres on troop 3 and,
+    /// when they can be reached, their contact opens as CONTACT FREMEN
+    /// TROOPS would (seg000:86cc).
+    private func findProspectors() {
+        let id = World.prospectorTroop
+        guard world.troopExists(id) else { return }
+        let map = flatMap
+        if let place = world.troopPlace(id) { map.centreOn(place) }
+        publishMapUI()
+        let here = World.placeOffset(world.currentLocation)
+        if world.w(0x1176) <= 1 && (world.troopByte(id, 3) & 0x40 != 0 || world.troopWord(id, 4) != here) { return }
+        if map.density { return }
+        lastContacted = id
+        openTroopContact(id)
+    }
+
+    /// The sietch chief's GIVE ORDERS TO TROOP (seg000:5a03): the map opens
+    /// on the troop behind this chief, without its DUNE MAP box, and its
+    /// popup; NO MORE ORDERS comes back here.
+    private func giveOrdersFromChief() {
+        guard let id = talkPerson.flatMap({ world.troopForPerson($0) }) ?? world.localTroop(hired: true) else { return }
+        talkPerson = nil
+        setNodeActive("Dialogue", false)
+        conversation = nil
+        openMap(select: false, caption: false)
+        openTroopContact(id, fromRoom: true)
+    }
 
     /// Entering a room (seg000:35b4): ds:23 = 5, the place is visited, and
     /// the first person here with a list-4 line whose condition holds says it.
@@ -1671,11 +2061,6 @@ final class Game: DuneNode {
         // The CD's own TALK TO ME / WHAT ? rows run the same handlers.
         if item == talkToMeRow { item = 133 } else if let what = whatRow, item == what { item = 138 }
 
-        if dialogueContext == .troop {
-            handleTroopMenu(index)
-            return
-        }
-
         if dialogueContext == .comm {
             if item == 204 { // " Viewed"
                 closeComm()
@@ -1714,7 +2099,7 @@ final class Game: DuneNode {
                 companionVerb(character)
             }
         case 136:
-            openTroopOrders()
+            giveOrdersFromChief()
         case 139:
             workForMe()
         case 138: // WHAT ?
@@ -1836,6 +2221,10 @@ final class Game: DuneNode {
             setNodeActive("VideoClip", false)
             showCurrentPlace()
             roomEntryScan()
+        }
+        if let due = pickCommitAt, clock >= due {
+            pickCommitAt = nil
+            endTroopPick(.queue)
         }
         checkIdle(elapsedTime)
         updateMusic()

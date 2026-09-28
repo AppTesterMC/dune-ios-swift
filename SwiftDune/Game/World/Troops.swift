@@ -58,6 +58,12 @@ extension World {
         setLocationByte(index, byte + 1, UInt8(value >> 8))
     }
 
+    /// A troop's 27-byte record (kept round an order it may refuse).
+    func troopRecord(_ id: Int) -> [UInt8] { Array(vars[troopOffset(id)..<(troopOffset(id) + World.troopSize)]) }
+    func setTroopRecord(_ id: Int, _ record: [UInt8]) {
+        for (k, v) in record.prefix(World.troopSize).enumerated() { setRawB(troopOffset(id) + k, v) }
+    }
+
     func troopExists(_ id: Int) -> Bool { id >= 1 && id <= World.troopCount && troopByte(id, 0) != 0 }
     func troopMotivation(_ id: Int) -> Int { Int(troopByte(id, 21)) }
     func troopSpiceSkill(_ id: Int) -> Int { Int(troopByte(id, 22)) }

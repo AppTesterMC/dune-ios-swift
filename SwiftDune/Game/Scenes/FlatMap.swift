@@ -29,6 +29,17 @@ final class FlatMap: DuneNode {
     private(set) var point: (latitude: Int, longitude: UInt16)?
     /// SEE SPICE DENSITY: rings around the known sietches.
     var density = false
+    /// Where the density popup goes (floppy ds:426C/426E): (75,15) from the
+    /// map (sub_8087), (0x5C,0x1E) over a troop's contact popup (sub_A5E5).
+    private(set) var densityOrigin = (x: 75, y: 15)
+    /// Over a troop's popup the popup shows the troop (sub_8F62) instead of
+    /// Paul's ornithopter, and its route (sub_AD0A).
+    private var densityTroop: (longitude: UInt16, latitude: Int)?
+    private var route: [(longitude: UInt16, latitude: Int)] = []
+    /// The troop contact popup over the map (map_draw_troop_contact_popup,
+    /// seg000:79ee): the troop and the chief's line.
+    var troopContact: (troop: Int, line: String)?
+    private let troopPanel = TroopContactPanel()
     /// The DUNE MAP box shown when the map opens from a room (4,993 ms).
     private var captionUntil: TimeInterval = 0
     /// 320 x 152 place index per pixel, 0xFF = none.
@@ -58,6 +69,8 @@ final class FlatMap: DuneNode {
             destination = nil
             point = nil
             density = false
+            troopContact = nil
+            setDensityForMap()
             captionUntil = (params["caption"] as? Bool ?? false) ? currentTime + 4.993 : 0
             centreOn(world.currentLocation)
         }
@@ -82,6 +95,37 @@ final class FlatMap: DuneNode {
         latitude = min(max(latitude + dy * 12, -75), 75)
     }
 
+
+    /// The density popup as SEE SPICE DENSITY shows it (setDensityForMap).
+    func setDensityForMap() {
+        densityOrigin = (75, 15)
+        densityTroop = nil
+        route = []
+    }
+
+    /// The density popup over a troop's contact popup: at (x, y), the
+    /// troop's marker at `marker` and its route through `route`.
+    func setDensityForTroop(x: Int, y: Int, marker: (longitude: UInt16, latitude: Int),
+                            route: [(longitude: UInt16, latitude: Int)]) {
+        densityOrigin = (x, y)
+        densityTroop = marker
+        self.route = route
+    }
+
+    /// The density popup's window (+(5,7), 160 x 89) centred on the view's
+    /// middle.
+    private var densityWindow: MapWindow {
+        MapWindow(x: densityOrigin.x + 5, y: densityOrigin.y + 7, width: 0xA0, height: 0x59,
+                  longitude: longitude, latitude: min(max(latitude + 18, -96), 96))
+    }
+
+    /// A tap on the density popup's window: the nearest known place within
+    /// 9 pixels (floppy 5e6d), nil for none or outside the window.
+    func densityHit(_ point: DunePoint) -> Int? {
+        let window = densityWindow
+        guard window.contains(Int(point.x), Int(point.y)) else { return nil }
+        return window.hit(x: Int(point.x), y: Int(point.y))
+    }
 
     /// Chooses a desert point directly (dev harness).
     func choosePoint(latitude: Int, longitude: UInt16) {
@@ -144,7 +188,12 @@ final class FlatMap: DuneNode {
             Primitives.drawLine(DunePoint(p.x - 3, p.y), DunePoint(p.x + 3, p.y), 0xFC, buffer, isOffset: false)
             Primitives.drawLine(DunePoint(p.x, p.y - 3), DunePoint(p.x, p.y + 3), 0xFC, buffer, isOffset: false)
         }
-        if density {
+        if let contact = troopContact {
+            // The density popup goes over the troop panel (sub_ACC0 draws
+            // the panel, then sub_80B0 the popup).
+            troopPanel.draw(buffer, troop: contact.troop, line: contact.line, compact: density, font: font)
+            if density { drawDensityOverlay(buffer, icons) }
+        } else if density {
             drawDensityOverlay(buffer, icons)
         } else if let destination = destination {
             drawPopup(buffer, destination)
@@ -157,21 +206,21 @@ final class FlatMap: DuneNode {
     private lazy var panelIcons = Sprite("ICONES.HSQ")
 
     /// SEE SPICE DENSITY (map_draw_spice_density_overlay, floppy sub_80B0;
-    /// the ScummVM port's drawDensityOverlay): the panel (ONMAP 0x8D) at
-    /// (75,15), its window at +(5,7) (160 x 89) centred on the view's middle
+    /// the ScummVM port's drawDensityOverlay): the panel (ONMAP 0x8D) at its
+    /// origin, its window at +(5,7) (160 x 89) centred on the view's middle
     /// in density mode, the places, Paul's ornithopter (ICONES 0x4C at
     /// (x - 13, y - h)), the dotted 80 x 40 box (0xFB, pattern 0x5555) round
     /// the view's centre, and the legend: "SPICE DENSITY", "-", the sixteen
-    /// shades 0x50-0x5F, "+".
+    /// shades 0x50-0x5F, "+". Over a troop's popup: the troop (ICONES 0x36
+    /// at (x, y - h)) and its route instead of the ornithopter.
     private func drawDensityOverlay(_ buffer: PixelBuffer, _ onmap: Sprite) {
-        let px = 75, py = 15
+        let px = densityOrigin.x, py = densityOrigin.y
         onmap.drawFrame(0x8D, x: Int16(px), y: Int16(py), buffer: buffer)
-        let window = MapWindow(x: px + 5, y: py + 7, width: 0xA0, height: 0x59,
-                               longitude: longitude, latitude: min(max(latitude + 18, -96), 96))
+        let window = densityWindow
         window.drawMap(buffer, spiceFields: spiceFields)
         window.drawMarkers(buffer, panelIcons)
         let here = world.location(world.currentLocation)
-        if let p = window.project(longitude: here.longitude, latitude: Int(here.latitude)) {
+        if densityTroop == nil, let p = window.project(longitude: here.longitude, latitude: Int(here.latitude)) {
             let h = Int(panelIcons.frame(at: 0x4C).height)
             window.drawIcon(buffer, panelIcons, 0x4C, left: p.x - 13, top: p.y - h)
         }
@@ -188,6 +237,13 @@ final class FlatMap: DuneNode {
                 raw[y * buffer.width + left] = 0xFB
                 raw[y * buffer.width + right - 1] = 0xFB
             }
+        }
+        if let troop = densityTroop {
+            if let p = window.project(longitude: troop.longitude, latitude: troop.latitude) {
+                let h = Int(panelIcons.frame(at: 0x36).height)
+                window.drawIcon(buffer, panelIcons, 0x36, left: p.x, top: p.y - h)
+            }
+            window.drawRoute(buffer, route)
         }
         guard let font = font else { return }
         font.paletteIndex = 0xFE

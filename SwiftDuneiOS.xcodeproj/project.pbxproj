@@ -98,6 +98,7 @@
 		FC030C6E0D93E68700834DA5 /* SpriteAnimation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D3B911A28F0BBD8BF4D86BA /* SpriteAnimation.swift */; };
 		FD89E79697094D65D8D768E2 /* Music.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE1B92319AA70E511EFB90AD /* Music.swift */; };
 		FE47D82F7D81098D156EC83A /* MusicSituation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79B17CEA2728E8C68CC7FBD6 /* MusicSituation.swift */; };
+		FE706951978463E2C12EE948 /* TroopContact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3642A328D8FD147FF3590DCB /* TroopContact.swift */; };
 		FEFA52DAF68263A524CA88D2 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74EEB4985D34BB840F532794 /* AudioPlayer.swift */; };
 /* End PBXBuildFile section */
 
@@ -117,6 +118,7 @@
 		288591827E1A743E7315BC55 /* Node.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Node.swift; sourceTree = "<group>"; };
 		2E43ACB358B4D725E8CBF867 /* Sound.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sound.swift; sourceTree = "<group>"; };
 		2F2930E460F696203B570E6D /* AppIcon60x60@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIcon60x60@2x.png"; sourceTree = "<group>"; };
+		3642A328D8FD147FF3590DCB /* TroopContact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TroopContact.swift; sourceTree = "<group>"; };
 		3A4E2ED11BE872387055ADC9 /* DevHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevHarness.swift; sourceTree = "<group>"; };
 		3E387EDA4831F07D1922BFA7 /* DuneIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuneIOSApp.swift; sourceTree = "<group>"; };
 		41386BC22871F9E97BBE2687 /* World.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = World.swift; sourceTree = "<group>"; };
@@ -231,6 +233,7 @@
 				B76C036D96F58DE99D06F9B1 /* Sky.swift */,
 				EA2567D35A1508EE0B553386 /* Stars.swift */,
 				0C9D1665A50F9BA406C96796 /* Sunrise.swift */,
+				3642A328D8FD147FF3590DCB /* TroopContact.swift */,
 				E24791A4FCCB8FADF4A51268 /* WormCall.swift */,
 				646FB83788BE85CCE173E510 /* WormRide.swift */,
 			);
@@ -568,6 +571,7 @@
 				FC030C6E0D93E68700834DA5 /* SpriteAnimation.swift in Sources */,
 				0522BA979FCA4060DB96AF49 /* Stars.swift in Sources */,
 				0AF3262F128BADDF4F5BF6ED /* Sunrise.swift in Sources */,
+				FE706951978463E2C12EE948 /* TroopContact.swift in Sources */,
 				C7EDC664102123EB9825EA0B /* Troops.swift in Sources */,
 				0142760B96248516BB095027 /* Types.swift in Sources */,
 				49DF4C3A6ABED5AB8B74DB25 /* UI.swift in Sources */,
