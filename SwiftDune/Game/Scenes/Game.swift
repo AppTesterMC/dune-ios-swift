@@ -347,6 +347,12 @@ final class Game: DuneNode {
             }
             return
         }
+        if map.density && point.x >= 75 && point.x < 85 && point.y >= 15 && point.y < 25 {
+            // The SPICE DENSITY panel's close box (ONMAP 0x8D's corner).
+            map.density = false
+            publishMapUI()
+            return
+        }
         if map.tap(point) {
             publishMapUI()
             return

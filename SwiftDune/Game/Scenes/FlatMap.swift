@@ -144,11 +144,59 @@ final class FlatMap: DuneNode {
             Primitives.drawLine(DunePoint(p.x - 3, p.y), DunePoint(p.x + 3, p.y), 0xFC, buffer, isOffset: false)
             Primitives.drawLine(DunePoint(p.x, p.y - 3), DunePoint(p.x, p.y + 3), 0xFC, buffer, isOffset: false)
         }
-        if let destination = destination {
+        if density {
+            drawDensityOverlay(buffer, icons)
+        } else if let destination = destination {
             drawPopup(buffer, destination)
         } else if currentTime < captionUntil {
             drawInfoBox(buffer)
         }
+    }
+
+    private lazy var spiceFields = Resource("MAP2.HSQ").unpackedData
+    private lazy var panelIcons = Sprite("ICONES.HSQ")
+
+    /// SEE SPICE DENSITY (map_draw_spice_density_overlay, floppy sub_80B0;
+    /// the ScummVM port's drawDensityOverlay): the panel (ONMAP 0x8D) at
+    /// (75,15), its window at +(5,7) (160 x 89) centred on the view's middle
+    /// in density mode, the places, Paul's ornithopter (ICONES 0x4C at
+    /// (x - 13, y - h)), the dotted 80 x 40 box (0xFB, pattern 0x5555) round
+    /// the view's centre, and the legend: "SPICE DENSITY", "-", the sixteen
+    /// shades 0x50-0x5F, "+".
+    private func drawDensityOverlay(_ buffer: PixelBuffer, _ onmap: Sprite) {
+        let px = 75, py = 15
+        onmap.drawFrame(0x8D, x: Int16(px), y: Int16(py), buffer: buffer)
+        let window = MapWindow(x: px + 5, y: py + 7, width: 0xA0, height: 0x59,
+                               longitude: longitude, latitude: min(max(latitude + 18, -96), 96))
+        window.drawMap(buffer, spiceFields: spiceFields)
+        window.drawMarkers(buffer, panelIcons)
+        let here = world.location(world.currentLocation)
+        if let p = window.project(longitude: here.longitude, latitude: Int(here.latitude)) {
+            let h = Int(panelIcons.frame(at: 0x4C).height)
+            window.drawIcon(buffer, panelIcons, 0x4C, left: p.x - 13, top: p.y - h)
+        }
+        if let c = window.project(longitude: longitude, latitude: min(max(latitude + 18, -96), 96)) {
+            let left = max(window.x, c.x - 0x28), top = max(window.y, c.y - 0x14)
+            let right = min(window.x + window.width, c.x + 0x28), bottom = min(window.y + window.height, c.y + 0x14)
+            let raw = buffer.rawPointer
+            // The pattern starts with a gap: the dots are one pixel in from the corners.
+            for x in stride(from: left + 1, to: right, by: 2) {
+                raw[top * buffer.width + x] = 0xFB
+                raw[(bottom - 1) * buffer.width + x] = 0xFB
+            }
+            for y in stride(from: top + 1, to: bottom, by: 2) {
+                raw[y * buffer.width + left] = 0xFB
+                raw[y * buffer.width + right - 1] = 0xFB
+            }
+        }
+        guard let font = font else { return }
+        font.paletteIndex = 0xFE
+        font.renderLine("SPICE DENSITY", x: px + 14, y: py + 98, buffer: buffer, style: .small)
+        font.renderLine("-", x: px + 89, y: py + 98, buffer: buffer, style: .small)
+        for k in 0..<16 {
+            Primitives.fillRect(DuneRect(Int16(px + 95 + 4 * k), Int16(py + 99), 3, 5), 0x50 + k, buffer, isOffset: false)
+        }
+        font.renderLine("+", x: px + 158, y: py + 98, buffer: buffer, style: .small)
     }
 
 
@@ -183,12 +231,6 @@ final class FlatMap: DuneNode {
             guard !l.hidden,
                   let p = world.mapRenderer.project(latitude: latitude, longitude: longitude,
                                                      placeLatitude: Int(l.latitude), placeLongitude: l.longitude) else { continue }
-            if density && l.isSietch && l.spiceDensity > 0 {
-                // ONMAP 133-140: eight rings, one per 32 of density (the
-                // original's scale is not decoded).
-                let ring = UInt16(133 + min(7, Int(l.spiceDensity) / 32))
-                icons.drawFrame(ring, x: p.x - 9, y: p.y - 9, buffer: buffer)
-            }
             // ONMAP 122-126: sietch, Atreides palace, village, fortress,
             // Harkonnen palace.
             let frame = UInt16(122 + l.kind)
